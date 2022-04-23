@@ -1,5 +1,4 @@
 (book summary) cka study guide
-https://learning.oreilly.com/library/view/certified-kubernetes-administrator/9781098107215/
 
 chapter 1
 
@@ -105,3 +104,406 @@ practicing exam
 			vagrant
 			docker toolbox
 				minikube
+
+chapter 2
+
+keywords
+
+	rbac
+	kubeadm, installation
+	upgrade versions
+	backup etcd
+	ha
+
+rbac: subject -- verb --> api resources
+
+authn strategies
+
+	x.509 client cert
+	basic auth
+	bearer token
+
+create a cert for user
+
+	1	mkdir cert && cd cert
+
+	2	openssl genrsa -out johndoe.key 2048   // output: johndoe.key
+
+	3	openssl req -new -key johndoe.key -out johndoe.csr -subj "/CN=johndoe/O=cka-study-guide"   // output: johndoe.csr
+
+	4	openssl x509 -req -in johndoe.csr -CA %userprofile%/.minikube/ca.crt -CAkey %userprofile%/.minikube/ca.key -out johndoe.crt -CAcreateserial -days 364   // output: johndoe.crt
+
+	5	k config set-credentials johndoe --client-certificate=johndoe.crt --client-key=johndoe.key
+		k config set-context johndoe-context --cluster=minikube --user=johndoe
+
+	6	k config use-context johndoe-context
+		k config current-context
+
+service account
+
+	// default sa
+	default
+
+	// create a new sa
+	k create serviceaccount build-bot
+
+	// listing sa
+	k get serviceaccounts
+	k get serviceaccount
+	k get sa
+
+	// details
+	k describe sa build-bot
+
+	// secrets
+	k get secrets
+
+	// assigning sa to pod (--serviceaccount will be removed in 1.24)
+	k run build-observer --image=alpine --restart=Never --serviceaccount=build-bot
+
+understanding rbac
+
+keywords
+
+	resource - role - rolebinding - user/group
+	role, rolebinding
+	clusterrole, clusterrolebinding
+
+default clusterrole
+
+	cluster-admin
+	admin
+	edit
+	view
+
+	k get clusterrole
+	NAME                                                                   CREATED AT
+	admin                                                                  2022-04-14T00:46:59Z
+	cluster-admin                                                          2022-04-14T00:46:59Z
+	edit                                                                   2022-04-14T00:47:00Z
+	kubeadm:get-nodes                                                      2022-04-14T00:47:04Z
+	system:aggregate-to-admin                                              2022-04-14T00:47:00Z
+	system:aggregate-to-edit                                               2022-04-14T00:47:00Z
+	system:aggregate-to-view                                               2022-04-14T00:47:00Z
+	system:auth-delegator                                                  2022-04-14T00:47:00Z
+	system:basic-user                                                      2022-04-14T00:46:59Z
+	system:certificates.k8s.io:certificatesigningrequests:nodeclient       2022-04-14T00:47:00Z
+	system:certificates.k8s.io:certificatesigningrequests:selfnodeclient   2022-04-14T00:47:00Z
+	system:certificates.k8s.io:kube-apiserver-client-approver              2022-04-14T00:47:01Z
+	system:certificates.k8s.io:kube-apiserver-client-kubelet-approver      2022-04-14T00:47:01Z
+	system:certificates.k8s.io:kubelet-serving-approver                    2022-04-14T00:47:01Z
+	system:certificates.k8s.io:legacy-unknown-approver                     2022-04-14T00:47:01Z
+	system:controller:attachdetach-controller                              2022-04-14T00:47:01Z
+	system:controller:certificate-controller                               2022-04-14T00:47:01Z
+	system:controller:clusterrole-aggregation-controller                   2022-04-14T00:47:01Z
+	system:controller:cronjob-controller                                   2022-04-14T00:47:01Z
+	system:controller:daemon-set-controller                                2022-04-14T00:47:01Z
+	system:controller:deployment-controller                                2022-04-14T00:47:01Z
+	system:controller:disruption-controller                                2022-04-14T00:47:01Z
+	system:controller:endpoint-controller                                  2022-04-14T00:47:01Z
+	system:controller:endpointslice-controller                             2022-04-14T00:47:01Z
+	system:controller:endpointslicemirroring-controller                    2022-04-14T00:47:01Z
+	system:controller:ephemeral-volume-controller                          2022-04-14T00:47:01Z
+	system:controller:expand-controller                                    2022-04-14T00:47:01Z
+	system:controller:generic-garbage-collector                            2022-04-14T00:47:01Z
+	system:controller:horizontal-pod-autoscaler                            2022-04-14T00:47:01Z
+	system:controller:job-controller                                       2022-04-14T00:47:01Z
+	system:controller:namespace-controller                                 2022-04-14T00:47:01Z
+	system:controller:node-controller                                      2022-04-14T00:47:01Z
+	system:controller:persistent-volume-binder                             2022-04-14T00:47:01Z
+	system:controller:pod-garbage-collector                                2022-04-14T00:47:01Z
+	system:controller:pv-protection-controller                             2022-04-14T00:47:01Z
+	system:controller:pvc-protection-controller                            2022-04-14T00:47:01Z
+	system:controller:replicaset-controller                                2022-04-14T00:47:01Z
+	system:controller:replication-controller                               2022-04-14T00:47:01Z
+	system:controller:resourcequota-controller                             2022-04-14T00:47:01Z
+	system:controller:root-ca-cert-publisher                               2022-04-14T00:47:02Z
+	system:controller:route-controller                                     2022-04-14T00:47:01Z
+	system:controller:service-account-controller                           2022-04-14T00:47:01Z
+	system:controller:service-controller                                   2022-04-14T00:47:01Z
+	system:controller:statefulset-controller                               2022-04-14T00:47:01Z
+	system:controller:ttl-after-finished-controller                        2022-04-14T00:47:01Z
+	system:controller:ttl-controller                                       2022-04-14T00:47:01Z
+	system:coredns                                                         2022-04-14T00:47:05Z
+	system:discovery                                                       2022-04-14T00:46:59Z
+	system:heapster                                                        2022-04-14T00:47:00Z
+	system:kube-aggregator                                                 2022-04-14T00:47:00Z
+	system:kube-controller-manager                                         2022-04-14T00:47:00Z
+	system:kube-dns                                                        2022-04-14T00:47:00Z
+	system:kube-scheduler                                                  2022-04-14T00:47:01Z
+	system:kubelet-api-admin                                               2022-04-14T00:47:00Z
+	system:monitoring                                                      2022-04-14T00:46:59Z
+	system:node                                                            2022-04-14T00:47:00Z
+	system:node-bootstrapper                                               2022-04-14T00:47:00Z
+	system:node-problem-detector                                           2022-04-14T00:47:00Z
+	system:node-proxier                                                    2022-04-14T00:47:01Z
+	system:persistent-volume-provisioner                                   2022-04-14T00:47:00Z
+	system:public-info-viewer                                              2022-04-14T00:46:59Z
+	system:service-account-issuer-discovery                                2022-04-14T00:47:01Z
+	system:volume-scheduler                                                2022-04-14T00:47:00Z
+	view                                                                   2022-04-14T00:47:00Z
+
+	// create roles (role <=> resources)
+	k create role read-only --verb=list,get,watch --resource=pods,deployments,services
+
+	// listing roles
+	k get roles
+	k get role
+
+	k get role read-only
+	k get role read-only -o yaml
+	k get role read-only -o json
+
+	k describe role read-only
+	Name:         read-only
+	Labels:       <none>
+	Annotations:  <none>
+	PolicyRule:
+	  Resources         Non-Resource URLs  Resource Names  Verbs
+	  ---------         -----------------  --------------  -----
+	  pods              []                 []              [list get watch]
+	  services          []                 []              [list get watch]
+	  deployments.apps  []                 []              [list get watch]
+
+	// create rolebindings (role <=> user)
+	k create rolebinding read-only-binding --role=read-only --user=johndoe
+
+	// list rolebindings
+	k get rolebindings
+	k get rolebinding
+
+	k describe rolebinding read-only-binding
+	Name:         read-only-binding
+	Labels:       <none>
+	Annotations:  <none>
+	Role:
+	  Kind:  Role
+	  Name:  read-only
+	Subjects:
+	  Kind  Name     Namespace
+	  ----  ----     ---------
+	  User  johndoe
+
+seeing the rbac rules in effect
+
+	k config current-context
+
+	k create deployment myapp --image=nginx --port=80 --replicas=2
+
+	k config use-context johndoe-context
+
+	k get deployments   // Expected: normal result. Actual: prompt username and password
+
+	k get replicasets   // Expected: Forbidden error. Actual: prompt username and password
+
+	k delete deployment myapp   // Expected: Forbidden error. Actual: prompt username and password
+
+checking all permissions
+
+	k auth can-i --list
+	Resources                                       Non-Resource URLs   Resource Names   Verbs
+	*.*                                             []                  []               [*]
+													[*]                 []               [*]
+	selfsubjectaccessreviews.authorization.k8s.io   []                  []               [create]
+	selfsubjectrulesreviews.authorization.k8s.io    []                  []               [create]
+													[/api/*]            []               [get]
+													[/api]              []               [get]
+													[/apis/*]           []               [get]
+													[/apis]             []               [get]
+													[/healthz]          []               [get]
+													[/healthz]          []               [get]
+													[/livez]            []               [get]
+													[/livez]            []               [get]
+													[/openapi/*]        []               [get]
+													[/openapi]          []               [get]
+													[/readyz]           []               [get]
+													[/readyz]           []               [get]
+													[/version/]         []               [get]
+													[/version/]         []               [get]
+													[/version]          []               [get]
+													[/version]          []               [get]
+
+	k auth can-i --list --as johndoe
+	Resources                                       Non-Resource URLs   Resource Names   Verbs
+	selfsubjectaccessreviews.authorization.k8s.io   []                  []               [create]
+	selfsubjectrulesreviews.authorization.k8s.io    []                  []               [create]
+													[/api/*]            []               [get]
+													[/api]              []               [get]
+													[/apis/*]           []               [get]
+													[/apis]             []               [get]
+													[/healthz]          []               [get]
+													[/healthz]          []               [get]
+													[/livez]            []               [get]
+													[/livez]            []               [get]
+													[/openapi/*]        []               [get]
+													[/openapi]          []               [get]
+													[/readyz]           []               [get]
+													[/readyz]           []               [get]
+													[/version/]         []               [get]
+													[/version/]         []               [get]
+													[/version]          []               [get]
+													[/version]          []               [get]
+	pods                                            []                  []               [list get watch]
+	services                                        []                  []               [list get watch]
+	deployments.apps                                []                  []               [list get watch]
+
+
+	k auth can-i list pods --as johndoe
+	yes
+
+	k auth can-i get pods --as johndoe
+	yes
+
+	k auth can-i delete pods --as johndoe
+	no
+
+	k auth can-i list pods --as minikube
+	no
+
+	k auth can-i get pods --as minikube
+	no
+
+aggregating rbac rules
+
+	k create ns rbac-example
+
+rule 1
+
+	k create clusterrole list-pods --verb=list --resource=pods  -n rbac-example
+
+	k get clusterrole list-pods -o yaml
+	apiVersion: rbac.authorization.k8s.io/v1
+	kind: ClusterRole
+	metadata:
+	  creationTimestamp: "2022-04-20T23:34:48Z"
+	  name: list-pods
+	  resourceVersion: "416094"
+	  uid: 2b5f074a-44ba-499a-8b44-7928f601531b
+	rules:
+	- apiGroups:
+	  - ""
+	  resources:
+	  - pods
+	  verbs:
+	  - list
+
+	k edit clusterrole list-pods
+	clusterrole.rbac.authorization.k8s.io/list-pods edited
+
+	k get clusterrole list-pods -o yaml
+	apiVersion: rbac.authorization.k8s.io/v1
+	kind: ClusterRole
+	metadata:
+	  creationTimestamp: "2022-04-20T23:34:48Z"
++	  labels:
++		rbac-pod-list: "true"
+	  name: list-pods
+	  resourceVersion: "416094"
+	  uid: 2b5f074a-44ba-499a-8b44-7928f601531b
+	rules:
+	- apiGroups:
+	  - ""
+	  resources:
+	  - pods
+	  verbs:
+	  - list
+
+	k describe clusterrole list-pods
+	Name:         list-pods
+	Labels:       rback-pod-list=true
+	Annotations:  <none>
+	PolicyRule:
+	  Resources  Non-Resource URLs  Resource Names  Verbs
+	  ---------  -----------------  --------------  -----
+	  pods       []                 []              [list]
+
+rule 2
+
+	k create clusterrole delete-services --verb=delete --resource=services -n rbac-example
+
+	k get clusterrole delete-services -o yaml
+	apiVersion: rbac.authorization.k8s.io/v1
+	kind: ClusterRole
+	metadata:
+	  creationTimestamp: "2022-04-20T23:39:48Z"
+	  name: delete-services
+	  resourceVersion: "416274"
+	  uid: cf80129c-7139-454a-8db0-9de13c5bad7b
+	rules:
+	- apiGroups:
+	  - ""
+	  resources:
+	  - services
+	  verbs:
+	  - delete
+
+	k edit clusterrole delete-services
+
+	k get clusterrole delete-services -o yaml
+	apiVersion: rbac.authorization.k8s.io/v1
+	kind: ClusterRole
+	metadata:
+	  creationTimestamp: "2022-04-20T23:39:48Z"
++	  labels:
++		rbac-service-delete: "true"
+	  name: delete-services
+	  resourceVersion: "416374"
+	  uid: cf80129c-7139-454a-8db0-9de13c5bad7b
+	rules:
+	- apiGroups:
+	  - ""
+	  resources:
+	  - services
+	  verbs:
+	  - delete
+
+aggregated rule 3
+
+	k create clusterrole pods-services-aggregation-rules --aggregation-rule="rbac-pod-list=true" --aggregation-rule="rbac-service-delete=true" -n rbac-example --dry-run=client -o yaml
+	aggregationRule:
+	  clusterRoleSelectors:
+	  - matchLabels:
+		  rbac-pod-list: "true"
+		  rbac-service-delete: "true"
+	apiVersion: rbac.authorization.k8s.io/v1
+	kind: ClusterRole
+	metadata:
+	  creationTimestamp: null
+	  name: pods-services-aggregation-rules
+	rules: null
+
+	k describe clusterrole pods-services-aggregation-rules -n rbac-example
+	Name:         pods-services-aggregation-rules
+	Labels:       <none>
+	Annotations:  <none>
+	PolicyRule:
+	  Resources  Non-Resource URLs  Resource Names  Verbs
+	  ---------  -----------------  --------------  -----
+
+	k edit clusterrole pods-services-aggregation-rules -o yaml
+
+	k get clusterrole pods-services-aggregation-rules -o yaml
+	aggregationRule:
+	  clusterRoleSelectors:
+	  - matchLabels:
+		  rbac-pod-list: "true"
++	  - matchLabels:
+		  rbac-service-delete: "true"
+	apiVersion: rbac.authorization.k8s.io/v1
+	kind: ClusterRole
+	metadata:
+	  creationTimestamp: "2022-04-20T23:49:03Z"
+	  name: pods-services-aggregation-rules
+	  resourceVersion: "416660"
+	  uid: e85aacc4-e99e-40a0-abfb-31b82a1cce92
+	rules: null
+
+	k describe clusterrole pods-services-aggregation-rules -n rbac-example
+	Name:         pods-services-aggregation-rules
+	Labels:       <none>
+	Annotations:  <none>
+	PolicyRule:
+	  Resources  Non-Resource URLs  Resource Names  Verbs
+	  ---------  -----------------  --------------  -----
+	  services   []                 []              [delete]
+	  pods       []                 []              [list]
