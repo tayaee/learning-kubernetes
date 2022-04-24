@@ -1,110 +1,3 @@
-(book summary) cka study guide
-
-chapter 1
-
-enable bash completion
-
-	// check
-	type _init_completion
-
-	// install
-	apt-get install bash-completion , yum install bash-completion
-
-	// enable
-	source /usr/share/bash-completion/bash_completion
-
-	// verify
-	type _init_completion
-
-enable kubectl completion
-
-	// bash
-	source <(kubectl completion bash)
-
-	// powershell
-	powershell
-	kubectl completion powershell | Out-String | Invoke-Expression
-
-set up alisa
-
-	alias k=kubectl
-	k version <tab><tab>
-
-short names
-
-	k config set-context <ctx> -n <ns>
-
-	k api-resources
-	NAME                              SHORTNAMES   APIVERSION                             NAMESPACED   KIND
-	bindings                                       v1                                     true         Binding
-	componentstatuses                 cs           v1                                     false        ComponentStatus
-	configmaps                        cm           v1                                     true         ConfigMap
-	endpoints                         ep           v1                                     true         Endpoints
-	nodes                             no           v1                                     false        Node
-	persistentvolumeclaims            pvc          v1                                     true         PersistentVolumeClaim
-	persistentvolumes                 pv           v1                                     false        PersistentVolume
-	pods                              po           v1                                     true         Pod
-	podtemplates                                   v1                                     true         PodTemplate
-	replicationcontrollers            rc           v1                                     true         ReplicationController
-	resourcequotas                    quota        v1                                     true         ResourceQuota
-	secrets                                        v1                                     true         Secret
-	serviceaccounts                   sa           v1                                     true         ServiceAccount
-	services                          svc          v1                                     true         Service
-	mutatingwebhookconfigurations                  admissionregistration.k8s.io/v1        false        MutatingWebhookConfiguration
-	validatingwebhookconfigurations                admissionregistration.k8s.io/v1        false        ValidatingWebhookConfiguration
-	customresourcedefinitions         crd,crds     apiextensions.k8s.io/v1                false        CustomResourceDefinition
-	apiservices                                    apiregistration.k8s.io/v1              false        APIService
-	controllerrevisions                            apps/v1                                true         ControllerRevision
-	daemonsets                        ds           apps/v1                                true         DaemonSet
-	deployments                       deploy       apps/v1                                true         Deployment
-	replicasets                       rs           apps/v1                                true         ReplicaSet
-	statefulsets                      sts          apps/v1                                true         StatefulSet
-	tokenreviews                                   authentication.k8s.io/v1               false        TokenReview
-	localsubjectaccessreviews                      authorization.k8s.io/v1                true         LocalSubjectAccessReview
-	selfsubjectaccessreviews                       authorization.k8s.io/v1                false        SelfSubjectAccessReview
-	selfsubjectrulesreviews                        authorization.k8s.io/v1                false        SelfSubjectRulesReview
-	subjectaccessreviews                           authorization.k8s.io/v1                false        SubjectAccessReview
-	horizontalpodautoscalers          hpa          autoscaling/v2                         true         HorizontalPodAutoscaler
-	cronjobs                          cj           batch/v1                               true         CronJob
-	jobs                                           batch/v1                               true         Job
-	certificatesigningrequests        csr          certificates.k8s.io/v1                 false        CertificateSigningRequest
-	leases                                         coordination.k8s.io/v1                 true         Lease
-	endpointslices                                 discovery.k8s.io/v1                    true         EndpointSlice
-	events                            ev           events.k8s.io/v1                       true         Event
-	flowschemas                                    flowcontrol.apiserver.k8s.io/v1beta2   false        FlowSchema
-	prioritylevelconfigurations                    flowcontrol.apiserver.k8s.io/v1beta2   false        PriorityLevelConfiguration
-	ingressclasses                                 networking.k8s.io/v1                   false        IngressClass
-	ingresses                         ing          networking.k8s.io/v1                   true         Ingress
-	networkpolicies                   netpol       networking.k8s.io/v1                   true         NetworkPolicy
-	runtimeclasses                                 node.k8s.io/v1                         false        RuntimeClass
-	poddisruptionbudgets              pdb          policy/v1                              true         PodDisruptionBudget
-	podsecuritypolicies               psp          policy/v1beta1                         false        PodSecurityPolicy
-	clusterrolebindings                            rbac.authorization.k8s.io/v1           false        ClusterRoleBinding
-	clusterroles                                   rbac.authorization.k8s.io/v1           false        ClusterRole
-	rolebindings                                   rbac.authorization.k8s.io/v1           true         RoleBinding
-	roles                                          rbac.authorization.k8s.io/v1           true         Role
-	priorityclasses                   pc           scheduling.k8s.io/v1                   false        PriorityClass
-	csidrivers                                     storage.k8s.io/v1                      false        CSIDriver
-	csinodes                                       storage.k8s.io/v1                      false        CSINode
-	csistoragecapacities                           storage.k8s.io/v1beta1                 true         CSIStorageCapacity
-	storageclasses                    sc           storage.k8s.io/v1                      false        StorageClass
-	volumeattachments                              storage.k8s.io/v1                      false        VolumeAttachment
-
-	k describe pods | grep -C 10 "author=John Doe"
-	k get pods -o yaml | grep -C 5 labels:
-
-help
-
-	k create --help
-
-practicing exam
-
-	windows
-		virtualbox
-			vagrant
-			docker toolbox
-				minikube
-
 chapter 2
 
 keywords
@@ -507,3 +400,344 @@ aggregated rule 3
 	  ---------  -----------------  --------------  -----
 	  services   []                 []              [delete]
 	  pods       []                 []              [list]
+
+creating and managing a kubernetes cluster ('kubeadm join' was not successful though)
+
+	master01			worker01			worker02
+	--------			--------			--------
+	kubeadm
+	cri-o
+						kubeadm
+						cri-o
+	kubeadm init
+						kubeadm join
+											kubeadm
+											cri-o
+											kubeadm join
+
+#1
+	# ubuntu 20.04, cri-o, 1 master, 2 worker, pod-network-cidr=10.244.0.0/16
+	# https://computingforgeeks.com/deploy-kubernetes-cluster-on-ubuntu-with-kubeadm/
+
+	export POD_NETWORK=10.244.0.0
+
+	#
+	# kubernetes (master, worker)
+	#
+
+	sudo apt update
+	# sudo apt -y full-upgrade
+	# [ -f /var/run/reboot-required ] && sudo reboot -f
+	sudo apt -y install curl apt-transport-https
+	curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+	echo "deb https://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+	sudo apt update
+	sudo apt -y install vim git curl wget kubelet kubeadm kubectl
+	sudo apt-mark hold kubelet kubeadm kubectl
+
+	kubectl version --client && kubeadm version
+
+	sudo sed -i '/swap/ s/^\(.*\)$/#\1/g' /etc/fstab
+	grep -v '^#' /etc/fstab | grep swap || echo OK
+	sudo swapoff -a
+
+	# Enable kernel modules
+	sudo modprobe overlay
+	sudo modprobe br_netfilter
+
+	# Add some settings to sysctl
+	sudo tee /etc/sysctl.d/kubernetes.conf << EOF
+	net.bridge.bridge-nf-call-ip6tables = 1
+	net.bridge.bridge-nf-call-iptables = 1
+	net.ipv4.ip_forward = 1
+	EOF
+
+	# Reload sysctl
+	sudo sysctl --system
+
+	#
+	# cri-o (master, worker)
+	#
+
+	# Ensure you load modules
+	sudo modprobe overlay
+	sudo modprobe br_netfilter
+
+	# Set up required sysctl params
+	sudo tee /etc/sysctl.d/kubernetes.conf << EOF
+	net.bridge.bridge-nf-call-ip6tables = 1
+	net.bridge.bridge-nf-call-iptables = 1
+	net.ipv4.ip_forward = 1
+	EOF
+
+	# Reload sysctl
+	sudo sysctl --system
+
+	# Add Cri-o repo
+	tee ~/cri-o-repo.sh << EOF
+	export OS="xUbuntu_20.04"
+	export VERSION=1.23
+	echo "deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/\$OS/ /" > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list
+	echo "deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/\$VERSION/\$OS/ /" > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable:cri-o:$VERSION.list
+	curl -sL https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable:cri-o:\$VERSION/\$OS/Release.key | apt-key add -
+	curl -sL https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/\$OS/Release.key | apt-key add -
+	EOF
+	sudo sh -x ~/cri-o-repo.sh
+
+	# Install CRI-O
+	sudo apt update
+	sudo apt install -y cri-o cri-o-runc
+
+	# Update CRI-O CIDR subnet
+	sudo sed -i "s/10.85.0.0/$POD_NETWORK/g" /etc/cni/net.d/100-crio-bridge.conf
+
+	# Start and enable Service
+	sudo systemctl daemon-reload
+	sudo systemctl restart crio
+	sudo systemctl enable crio
+	sudo systemctl status crio --no-pager
+
+#2
+
+	# https://computingforgeeks.com/deploy-kubernetes-cluster-on-ubuntu-with-kubeadm/
+
+	export POD_NETWORK=10.244.0.0
+
+	#
+	# init master
+	#
+
+	lsmod | grep br_netfilter
+	sudo systemctl enable kubelet
+	sudo kubeadm config images pull --cri-socket /var/run/crio/crio.sock
+
+	# sudo vi /etc/hosts
+	# 192.168.1.65 k8s-master01
+	# 192.168.1.66 k8s-worker01
+	# 192.168.1.67 k8s-worker02
+
+	# sudo kubeadm init --pod-network-cidr=$POD_NETWORK/16 --cri-socket /var/run/crio/crio.sock --upload-certs --control-plane-endpoint=192.168.1.65
+	sudo kubeadm init --pod-network-cidr=$POD_NETWORK/16
+
+	mkdir -p $HOME/.kube
+	sudo cp -f /etc/kubernetes/admin.conf $HOME/.kube/config
+	sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+	kubectl cluster-info
+
+	# cni
+	kubectl create -f https://docs.projectcalico.org/manifests/tigera-operator.yaml
+	kubectl create -f https://docs.projectcalico.org/manifests/custom-resources.yaml
+
+	watch kubectl get pods --all-namespaces
+
+#3
+
+	#
+	# second master
+	#
+
+	# sudo vi /etc/hosts
+	# 192.168.1.65 kube-master
+	# 192.168.1.66 kube-worker-1
+	# 192.168.1.67 kube-worker-2
+
+	kubeadm join k8s-master01:6443 \
+		--token sr4l2l.2kvot0pfalh5o4ik \
+		--discovery-token-ca-cert-hash sha256:c692fb047e15883b575bd6710779dc2c5af8073f7cab460abd181fd3ddb29a18 \
+		--control-plane
+
+#4
+
+	#
+	# worker node
+	#
+
+	# sudo vi /etc/hosts
+	# 192.168.1.65 kube-master
+	# 192.168.1.66 kube-worker-1
+	# 192.168.1.67 kube-worker-2
+
+	export POD_NETWORK=10.244.0.0
+
+	kubeadm join k8s-master01:6443 \
+	  --token sr4l2l.2kvot0pfalh5o4ik \
+	  --discovery-token-ca-cert-hash sha256:c692fb047e15883b575bd6710779dc2c5af8073f7cab460abd181fd3ddb29a18
+
+managing a highly-available cluster
+
+	master-lb
+		master01
+		master02
+		master03
+	worker01
+	worker02
+	worker03
+
+	master01			master02			worker01			worker02
+	--------			--------			--------			--------
+	kubeadm
+	cri-o
+											kubeadm
+											cri-o
+	kubeadm init
+											kubeadm join
+																kubeadm
+																cri-o
+																kubeadm join
+						kubeadm join
+
+	kubeadm join k8s-master01:6443 \
+		--token sr4l2l.2kvot0pfalh5o4ik \
+		--discovery-token-ca-cert-hash sha256:c692fb047e15883b575bd6710779dc2c5af8073f7cab460abd181fd3ddb29a18 \
+		--control-plane
+
+external etcd topology
+
+	master-lb
+		master01 -> etcd01
+		master02 -> etcd02
+		master03 -> etcd03
+	worker01
+	worker02
+	worker03
+
+upgrading a cluster version
+
+	1.18.0 to 1.19.0
+
+#1 upgrade master node
+
+	// current node version: 1.18.0
+	kubectl get nodes
+
+	sudo apt update
+
+	// see available versions: want to upgrade to 1.19.0
+	sudo apt-cache madison kubeadm
+
+	// upgrade method 1
+	sudo apt-mark unhold kubeadm
+	sudo apt-get update
+	sudo apt-get install -y kubeadm=1.19.0-00
+	sudo apt-mark hold kubeadm
+
+	// upgrade method 2
+	sudo apt-get update
+	sudo apt-get install -y --allow-change-held-packages kubeadm=1.19.0-00
+
+	sudo kubeadm upgrade plan
+
+	sudo kubeadm upgrade apply v1.19.0
+
+	// upgrade cni as well here
+
+	sudo drain kube-master --ignore-daemonsets
+
+	// upgrade
+	sudo apt-mark unhold kubelet kubectl
+	sudo apt-get update
+	sudo apt-get install -y kubelet=1.19.0-00 kubectl=1.19.0-00
+	sudo apt-mark hold kubelet kubectl
+
+	//restart
+	sudo systemctl daemon-reload
+	sudo systemctl resteart kubelet
+
+	// reenable control plain
+	kubectl uncordon kube-master
+
+#1 upgrade worker node
+
+	// upgrade kubeadm
+	sudo apt-mark unhold kubeadm
+	sudo apt-get update
+	sudo apt-get install -y kubeadm=1.19.0-00
+	sudo apt-mark hold kubeadm
+
+	// upgrade node
+	sudo kubeadm upgrade node
+
+	// drain
+	sudo drain kube-worker-1 --ignore-daemonsets
+
+	// upgrade kubelet and kubectl
+	sudo apt-mark unhold kubelet kubectl
+	sudo apt-get update
+	sudo apt-get install -y kubelet=1.19.0-00 kubectl=1.19.0-00
+	sudo apt-mark hold kubelet kubectl
+
+	// restart
+	sudo systemctl daemon-reload
+	sudo systemctl resteart kubelet
+
+	// reenable worker node
+	kubectl uncordon kube-worker-1
+
+backing up and restoring etcd
+
+	etcd01
+	etcd02
+
+#1 on kube-master
+
+	sudo apt update
+	sudo apt install -y etcd-client
+
+	etcdctl version
+
+	// get etcd pod name: etcd-kube-master
+	kubectl get pod -n kube-system
+
+		NAME                                   READY   STATUS    RESTARTS   AGE
+		coredns-64897985d-t9rxz                0/1     Pending   0          85m
+		coredns-64897985d-zjtxq                0/1     Pending   0          85m
+		etcd-k8s-master01                      1/1     Running   0          85m <==
+		kube-apiserver-k8s-master01            1/1     Running   0          85m
+		kube-controller-manager-k8s-master01   1/1     Running   0          85m
+		kube-proxy-kbn7v                       1/1     Running   0          85m
+		kube-scheduler-k8s-master01            1/1     Running   0          85m
+
+	kubectl describe pod etcd-k8s-master01 -n kube-system
+		...
+		Command:
+			  etcd
+			  --advertise-client-urls=https://10.0.2.15:2379
+			  --cert-file=/etc/kubernetes/pki/etcd/server.crt
+			  --client-cert-auth=true
+			  --data-dir=/var/lib/etcd
+			  --initial-advertise-peer-urls=https://10.0.2.15:2380
+			  --initial-cluster=k8s-master01=https://10.0.2.15:2380
+			  --key-file=/etc/kubernetes/pki/etcd/server.key
+			  --listen-client-urls=https://127.0.0.1:2379,https://10.0.2.15:2379
+			  --listen-metrics-urls=http://127.0.0.1:2381
+			  --listen-peer-urls=https://10.0.2.15:2380
+			  --name=k8s-master01
+			  --peer-cert-file=/etc/kubernetes/pki/etcd/peer.crt
+			  --peer-client-cert-auth=true
+			  --peer-key-file=/etc/kubernetes/pki/etcd/peer.key
+			  --peer-trusted-ca-file=/etc/kubernetes/pki/etcd/ca.crt
+			  --snapshot-count=10000
+			  --trusted-ca-file=/etc/kubernetes/pki/etcd/ca.crt
+
+	sudo ETCDCTL_API=3 etcdctl --cacert=/etc/kubernetes/pki/etcd/ca.crt --cert=/etc/kubernetes/pki/etcd/server.crt --key=/etc/kubernetes/pki/etcd/server.key snapshot save /opt/etcd-backup.db
+
+#2 restoring etcd
+
+	ls -l /opt/etcd-backup.db
+	sudo ETCDCTL_API=3 etcdctl --data-dir=/var/lib/from-backup snapshot restore /opt/etcd-backup.db
+	sudo ls -l /var/lib/from-backup
+
+	// edit .spec.volumes[].hostPath.path: /var/lib/etcd => /var/lib/from-backup
+	cd /etc/kubernetes/manifests
+	sudo vi etcd.yaml
+
+	// restart
+	kubectl delete pod etcd-k8s-master01 -n kube-system
+
+	// log
+	kubectl log -f etcd-k8s-master01 -n kube-system
+
+	백업본으로는 pod 상태가 Running이 안 되네. 계속 Pending 이었음. 구성 원복했음.
+
