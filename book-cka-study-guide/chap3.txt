@@ -1,0 +1,350 @@
+chapter 3 managing workloads
+
+	// dry-run
+	kubectl create deployment app-cache --image=memcached --replicas=4 --dry-run=client -o yaml
+
+		apiVersion: apps/v1
+		kind: Deployment
+		metadata:
+		  creationTimestamp: null
+		  labels:
+			app: app-cache
+		  name: app-cache
+		spec:
+		  replicas: 4
+		  selector:
+			matchLabels:
+			  app: app-cache
+		  strategy: {}
+		  template:
+			metadata:
+			  creationTimestamp: null
+			  labels:
+				app: app-cache
+			spec:
+			  containers:
+			  - image: memcached
+				name: memcached
+				resources: {}
+		status: {}
+
+			spec.template.metadata.labels.app: app-cache	pod의 레이블 값을 app-cache로 정의
+			spec.selector.matchLabels.app: app-cache		deployment가 타게팅하는 pod
+			metadata.labels.app: app-cache					deployment 그 자체의 레이블, pod의 label과 같게 해야
+
+	// create
+	kubectl create deployment app-cache --image=memcached --replicas=4
+
+	// dp
+	kubectl get deployments
+	kubectl get deployment
+	kubectl get deploy
+
+		NAME        READY   UP-TO-DATE   AVAILABLE   AGE
+		app-cache   0/4     4            0           14m
+
+	// pods
+	kubectl get pods
+	kubectl get pod
+
+		NAME                         READY   STATUS    RESTARTS   AGE
+		app-cache-856849875d-flhcd   0/1     Pending   0          15m
+		app-cache-856849875d-gtwgm   0/1     Pending   0          15m
+		app-cache-856849875d-q4xgn   0/1     Pending   0          15m
+		app-cache-856849875d-sstxm   0/1     Pending   0          15m
+
+	// details
+	kubectl describe deployment app-cache
+
+		Name:                   app-cache
+		Namespace:              default
+		CreationTimestamp:      Sun, 24 Apr 2022 20:09:39 +0000
+		Labels:                 app=app-cache
+		Annotations:            deployment.kubernetes.io/revision: 1
+		Selector:               app=app-cache
+		Replicas:               4 desired | 4 updated | 4 total | 0 available | 4 unavailable
+		StrategyType:           RollingUpdate
+		MinReadySeconds:        0
+		RollingUpdateStrategy:  25% max unavailable, 25% max surge
+		Pod Template:
+		  Labels:  app=app-cache
+		  Containers:
+		   memcached:
+			Image:        memcached
+			Port:         <none>
+			Host Port:    <none>
+			Environment:  <none>
+			Mounts:       <none>
+		  Volumes:        <none>
+		Conditions:
+		  Type           Status  Reason
+		  ----           ------  ------
+		  Available      False   MinimumReplicasUnavailable
+		  Progressing    False   ProgressDeadlineExceeded
+		OldReplicaSets:  <none>
+		NewReplicaSet:   app-cache-856849875d (4/4 replicas created)
+		Events:
+		  Type    Reason             Age   From                   Message
+		  ----    ------             ----  ----                   -------
+		  Normal  ScalingReplicaSet  16m   deployment-controller  Scaled up replica set app-cache-856849875d to 4
+
+	// edit
+	kubectl edit deploy app-cache
+
+	// delete
+	kubectl delete deployment app-cache
+
+rolling updates, rollback
+
+roll out a new revision
+
+	kubectl create deployment app-cache --image=memcached:1.6.8 --replicas=3 --record --dry-run=client -o yaml
+
+		apiVersion: apps/v1
+		kind: Deployment
+		metadata:
+		  creationTimestamp: null
+		  labels:
+			app: app-cache
+		  name: app-cache
+		spec:
+		  replicas: 3
+		  selector:
+			matchLabels:
+			  app: app-cache
+		  strategy: {}
+		  template:
+			metadata:
+			  creationTimestamp: null
+			  labels:
+				app: app-cache
+			spec:
+			  containers:
+			  - image: memcached:1.6.8
+				name: memcached
+				resources: {}
+		status: {}
+
+	// create dep
+	kubectl create deployment app-cache --image=memcached:1.6.8 --replicas=3 --record (x)
+	kubectl create deployment app-cache --image=memcached:1.6.8 --replicas=3
+
+	kubectl rollout status deployment app-cache
+
+		Waiting for deployment "app-cache" rollout to finish: 0 of 3 updated replicas are available...
+		Waiting for deployment "app-cache" rollout to finish: 1 of 3 updated replicas are available...
+		Waiting for deployment "app-cache" rollout to finish: 2 of 3 updated replicas are available...
+		deployment "app-cache" successfully rolled out
+
+	kubectl rollout history deployment app-cache
+
+	kubectl edit deployment app-cache // 1.6.8 to 1.6.9
+
+	kubectl rollout history deployments app-cache --revision=2
+
+roll back
+
+	kubectl rollout undo deployment app-cache --to-revision=1
+
+	kubectl rollout history deployment app-cache
+
+scaling workloads
+
+	watch kubectl get pods
+
+	kubectl scale deployment app-cache --replicas=6
+
+manually scaling a statefulset
+
+	kubectl run redis --image=redis --dry-run=client -o yaml
+
+	kubectl create -f redis.yaml --dry-run=client -o yaml
+
+	kubectl create -f redis.yaml
+
+	kubectl get statefulset redis
+
+	watch kubectl get pods
+
+	kubectl scale statefulset redis --replicas=3
+
+	kubectl get statefulset redis
+
+	kubectl get pods
+
+autoscaling a deployment (hpa)
+
+	kubectl autoscale deployment app-cache --cpu-percent=80 --min=3 --max=5 --dry-run=client -o yaml
+
+	kubectl autoscale deployment app-cache --cpu-percent=80 --min=3 --max=5
+
+	// listing hpa
+	kubectl get hpa
+
+	// details
+	kubectl describe hpa app-cache
+
+	// adjust
+	kubectl edit hpa app-cache
+
+		resources:
+			requests:
+				cpu: 250m		// 0.25개
+				memory: 100Mi	// 100 * 2^20 bytes
+			limits:
+				cpu: 500m
+				memory: 500Mi
+
+defining and consuming config data
+
+	spec.containers[].env[]
+
+		env:
+		- name: MEMCACHED_CONNECTIONS
+		  value: 2048
+		- name: MEMCACHED_THREADS
+		  value: 150
+
+creating a configmap
+
+	--from-literal=LOCALE=en_US
+	--from-env-file=config.env
+	--from-file=app-config.json
+	--from-file=config-dir
+
+	kubectl create configmap db-config --from-literal=DB_HOST=mysql-service --from-literal=DB_USER=dbuser --dry-run=client -o yaml
+
+	kubectl create configmap db-config --from-literal=DB_HOST=mysql-service --from-literal=DB_USER=dbuser
+
+configmapref
+
+	spec.containers[].envFrom
+
+	envFrom:
+	- configMapRef:
+	  name: db-config
+
+mounting a configmap as volume
+
+	kubectl create configmap db-config --from-file=db.json
+
+	spec:
+	  containers:
+	  - image: bmuschko/web-app:1.0.1
+	    name: backend
+		volumeMounts:
+		- name: db-config-volume
+  		  mountPath: /etc/config
+	  volumes:
+	  - name: db-config-volume
+	    configMap:
+		  name: db-config
+
+	kubectl exec -it backend -- /bin/sh
+		ls -l /etc/config
+		cat /etc/config/db.json
+
+creating a secret
+
+	generic
+	docker-registry
+	tls
+
+	--from-literal=password=secret
+	--from-env-file=conig.env
+	--from-file=id_rsa=~/.ssh/id_rsa
+	--from-file=config-dir
+
+	k create secret generic db-creds --from-literal=PWD=s3cret
+
+	k get secret db-creds -o json | jq -r .data.PWD | base64 -d
+
+consuming a secret as environment variables
+
+// ch3-basic-auth.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: secret-basic-auth
+type: kubernetes.io/basic-auth
+stringData:
+  username: one
+  password: two
+
+// ch3-backend.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: backend
+spec:
+  containers:
+  - image: bmuschko/web-app:1.0.1
+    name: backend
+    envFrom:
+    - secretRef:
+        name: secret-basic-auth
+
+	k apply -f basic-auth.yaml
+
+	k apply -f backend.yaml
+
+	k exec backend -- env
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+HOSTNAME=backend
+password=two
+username=one
+KUBERNETES_SERVICE_HOST=10.96.0.1
+KUBERNETES_SERVICE_PORT=443
+KUBERNETES_SERVICE_PORT_HTTPS=443
+KUBERNETES_PORT=tcp://10.96.0.1:443
+KUBERNETES_PORT_443_TCP=tcp://10.96.0.1:443
+KUBERNETES_PORT_443_TCP_PROTO=tcp
+KUBERNETES_PORT_443_TCP_PORT=443
+KUBERNETES_PORT_443_TCP_ADDR=10.96.0.1
+NODE_VERSION=12.19.0
+YARN_VERSION=1.22.5
+HOME=/root
+
+
+mounting a secret as volume
+
+	type: kubernetes.io/ssh-auth
+
+	// create a secret
+	# cp ~/.ssh/id_rsa ssh-privatekey
+	echo one > ssh-privatekey
+	k create secret generic secret-ssh-auth --from-file=ssh-privatekey --type=kubernetes.io/ssh-auth
+
+	// reference the secret
+
+// ch3-backend.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: backend
+  name: backend
+spec:
+  containers:
+  - image: bmuschko/web-app:1.0.1
+    name: backend
+	volumeMounts:
+	- name: ssh-volume
+	  mountPath: /var/app
+	  readOnly: true
+  volumes:
+  - name: ssh-volume
+    secret:
+	  secretName: secret-ssh-auth
+
+	// k apply -f backend.yaml
+	// k edit pod backend
+
+	// check
+	k exec backend -it -- /bin/bash
+	# ls -l /var/app
+	total 0
+	lrwxrwxrwx 1 root root 21 Apr 27 03:21 ssh-privatekey -> ..data/ssh-privatekey
+
+	# cat /var/app/ssh-privatekey
+	one
