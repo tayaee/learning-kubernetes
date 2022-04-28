@@ -156,7 +156,7 @@ scaling workloads
 
 manually scaling a statefulset
 
-	kubectl run redis --image=redis --dry-run=client -o yaml
+	kubectl run redis --image=redis --dry-run=client -o yaml > redis.yaml
 
 	kubectl create -f redis.yaml --dry-run=client -o yaml
 
