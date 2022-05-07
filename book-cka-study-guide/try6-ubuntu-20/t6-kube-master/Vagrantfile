@@ -1,0 +1,13 @@
+Vagrant.configure("2") do |config|
+  config.vm.box = "bento/ubuntu-20.04"
+  config.vm.network "public_network"
+  config.vm.hostname = ENV['VM_NAME']
+  config.vm.synced_folder "../shared", "/shared_data"
+  config.vm.provider "virtualbox" do |vb|
+    vb.cpus = "4"
+    vb.memory = "8192"
+  end
+  config.vm.provision "shell", inline: <<-SHELL
+    sh -x /shared_data/common.sh
+  SHELL
+end

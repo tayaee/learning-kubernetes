@@ -1,0 +1,1 @@
+https://containerjournal.com/features/setting-up-kubernetes-in-an-on-premises-environment/

@@ -1,0 +1,988 @@
+chapter 5 services and networking
+
+kubernetes networking basics
+
+communication between containers
+
+	// use 'localhost'
+
+	// ch5-multi-container.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: multi-container
+  labels:
+    app: multi-container
+spec:
+  containers:
+  - image: nginx
+    name: app
+    ports:
+    - containerPort: 80
+  - image: curlimages/curl:7.79.1
+    name: sidecar
+    args:
+    - /bin/sh
+    - -c
+    - 'while true; do curl localhost:80; sleep 5; done'
+
+	k apply -f ch5-multi-container.yaml
+
+	k logs multi-container -c app -f
+
+	k logs multi-container -c sidecar -f
+
+	k get all --show-labels
+
+	k delete all -l app=multi-container --force
+
+communication bewteen pods
+
+	// use pod ip. every pod has a unique ip.
+
+	k run nginx --image=nginx --port=80
+
+	// get pod ip
+	k get pod/nginx -o json | jq -r .status.podIP
+		172.17.0.6
+
+	// access another pod using pod ip
+	k-curl curl -s 172.17.0.6
+	kubectl run curl --image=curlimages/curl:7.79.1 -it --rm --restart=Never -- curl -s 172.17.0.6
+
+	k-wget wget -O- 172.17.0.6
+	kubectl run wget --image=busybox -it --rm --restart=Never -- wget -O- 172.17.0.6
+
+	k get nodes minikube -o json | jq -r .spec.podCIDR
+	10.244.0.0/24   // 이상하네, pod cidr은 10.244 인데 왜 pod ip는 172.17 이지?
+
+understanding services: ClusterIP, NodePort, LoadBalancer
+
+create a pod and expose it (method #1)
+
+	// create a pod
+	k run echoserver --image=k8s.gcr.io/echoserver:1.10 --restart=Never --port=8080
+
+	// pod ip
+	k-podip echoserver
+	kubectl get pod echoserver -o json | jq -r .status.podIP
+	172.17.0.7
+
+	// container port
+	k-containerport echoserver
+	kubectl get pod echoserver -o json | jq -r .spec.containers[0].ports[0].containerPort
+	8080
+
+	// 클러스터 안에서 pod 직접 액세스 가능: 172.17.0.7:8080
+	k-curl http://172.17.0.7:8080/one/two?three=four
+	kubectl run curl --image=curlimages/curl:7.79.1 -it --rm --restart=Never -- http://172.17.0.7:8080/one/two?three=four
+	<removed output>
+
+	// create a service for the pod
+	k create service clusterip echoserver --tcp=80:8080
+
+	// service port
+	k-serviceport echoserver
+	kubectl get services echoserver -o json | jq -r .spec.ports[0].port
+	80
+
+	// clusterip를 이용하여 액세스를 해보는데
+	k-curl http://10.110.25.91:80/one/two?three=four  // 잘 안 되네.
+
+	k delete svc echoserver --force
+	k delete pod echoserver --force
+
+create a pod and expose it (method #2)
+
+	// create a pod and expose it
+	k run echoserver --image=k8s.gcr.io/echoserver:1.10 --restart=Never --port=8080 --expose
+
+	k-service-endpoint.bat echoserver
+	kubectl get services echoserver -o json | jq -r .spec.clusterIP
+	10.108.204.137
+	kubectl get services echoserver -o json | jq -r .spec.ports[0].port
+	8080
+	kubectl get services echoserver -o json | jq -r .spec.ports[0].targetPort
+	8080
+
+	k-curl http://10.108.204.137:8080/one/two		// 이건 잘 되고.
+	kubectl run curl --image=curlimages/curl:7.79.1 -it --rm --restart=Never -- http://10.108.204.137:8080/one/two
+
+create a deployment and expose it (method #3 - popular)
+
+	laptop
+		cluster
+			minikube node
+				service
+					deployment
+						pod
+						pod
+
+	k create deployment echoserver --image=k8s.gcr.io/echoserver:1.10 --port=8080 --replicas=2
+
+	k expose deployment echoserver --port=80 --target-port=8080
+
+	k-podip echoserver-7b4bf497fd-krlm7
+	kubectl get pod echoserver-7b4bf497fd-krlm7 -o json | jq -r .status.podIP
+	172.17.0.5
+
+	k-service-endpoint.bat echoserver
+	kubectl get services echoserver -o json | jq -r .spec.clusterIP
+	10.107.190.93
+	kubectl get services echoserver -o json | jq -r .spec.ports[0].port
+	80
+	kubectl get services echoserver -o json | jq -r .spec.ports[0].targetPort
+	8080
+
+	// 같은 pod에서 container-to-container 접근. OK
+	k-bash echoserver-7b4bf497fd-krlm7
+	curl localhost:8080
+
+	// 같은 클러스터 안의 pod-to-pod 접근. OK
+	k-curl curl http://172.17.0.5:8080/one/two
+	kubectl run curl --image=curlimages/curl:7.79.1 -it --rm --restart=Never -- curl http://172.17.0.5:8080/one/two
+
+	// 같은 클러스터 안에서 pod-to-service 접근. OK
+	k-curl http://10.107.190.93:80/one/two
+	kubectl run curl --image=curlimages/curl:7.79.1 -it --rm --restart=Never -- http://10.107.190.93:80/one/two
+
+	k delete all -l app=echoserver --force
+
+rendering details
+
+	k describe service echoserver
+	OR
+	k get svc echoserver -o wide
+	NAME         TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE     SELECTOR
+	echoserver   ClusterIP   10.107.190.93   <none>        80/TCP    5m14s   app=echoserver
+
+	// load balancing targets
+	k get endpoints echoserver
+	OR
+	k get ep echoserver
+	NAME         ENDPOINTS                         AGE
+	echoserver   172.17.0.5:8080,172.17.0.6:8080   5m35s
+
+port mapping
+
+	curl inside cluster
+		-> spec.ports[].port   // curl이 사용하는 포트
+			-> spec.ports[].targetPort
+				-> spec.containers[].ports[].containerPort  // targetPort와 containerPort가 동일해야 하겠지.
+
+accessing a service with type NodePort
+
+	laptop
+		cluster
+			minikube node
+				service
+					pod
+					pod
+
+	// create a deployment at port 8080
+	k create deployment echoserver --image=k8s.gcr.io/echoserver:1.10 --port=8080 --replicas=2
+
+	// expose the service via node port 5005
+	k create service nodeport echoserver --tcp=5005:8080
+
+	// get node ip
+	k get node minikube -o wide
+	NAME       STATUS   ROLES                  AGE    VERSION   INTERNAL-IP      EXTERNAL-IP   OS-IMAGE              KERNEL-VERSION   CONTAINER-RUNTIME
+	minikube   Ready    control-plane,master   4d4h   v1.23.3   192.168.59.101   <none>        Buildroot 2021.02.4   4.19.202         docker://20.10.12
+
+	// get node ip
+	minikube ip
+	192.168.59.101
+
+	k-service-endpoint.bat echoserver
+		Service Type: NodePort
+		minikube ip
+			192.168.59.101
+		k get node minikube -o json | jq -r .status.addresses[0].address
+			192.168.59.101
+		kubectl get service echoserver -o json | jq -r .spec.ports[0].nodePort
+			31530
+
+	// laptop to minikube node
+	curl 192.168.59.101:31530  // OK
+
+	// clean up
+	k delete all -l app=echoserver --grace-period=0 --force
+
+accessing a service with type LoadBalancer
+
+	start minikube tunnel
+
+	laptop
+		cluster
+			minikube node
+				service
+					pod
+					pod
+
+	// create a deployment at port 8080
+	k create deployment echoserver --image=k8s.gcr.io/echoserver:1.10 --port=8080 --replicas=2
+	k scale deployment echoserver --replicas=3
+
+	// expose the service via node port 5005
+	k create service loadbalancer echoserver --tcp=5005:8080
+
+	// loadbalancer ip 구하기
+	k get svc echoserver -o wide
+	NAME         TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE     SELECTOR
+	echoserver   LoadBalancer   10.100.159.61   <pending>     5005:31857/TCP   6m56s   app=echoserver
+
+	// laptop to loadbalancer
+	curl http://EXTERNAL-IP:5005  // 잘 안 되네? EXTERNAL-IP 값이 안 나와
+
+	// clean up
+	k delete all -l app=echoserver --grace-period=0 --force
+
+using ingress
+
+	// get ingress
+	kubectl get ingress
+
+	// 없어? pod가 ingress 실행중인가?
+	kubectl get pods -n ingress-nginx
+
+	// 없어? ingress addon이 enable 되어 있는가?
+	minikube addons list | grep ingress
+
+	// 없어? 그러면 enable ingress
+	minikube addons enable ingress
+
+	k create deployment ex12 --image=bmuschko/nodejs-hello-world:1.0.0
+	// k create service nodeport ex12 --tcp=3000:3000
+	k expose deployment ex12 --type=NodePort --port=3000
+
+	minikube ip --node=minikube-m03
+	192.168.59.104
+
+	E:\Dropbox\src\cka-study-guide\ch05>curl 192.168.59.104:30033
+	Hello World
+
+	k create ingress ex12 --default-backend=ex12:3000 --dry-run=client -o yaml
+
+		apiVersion: networking.k8s.io/v1
+		kind: Ingress
+		metadata:
+		  creationTimestamp: null
+		  name: ex12
+		spec:
+	+	  rules:
+	+		- host: ex12.demo.com.local
+	+		  http:
+	+			paths:
+	+			  - path: /
+	+				pathType: Prefix			// Exact, Prefix
+	+				backend:
+	+				  service:
+	+					name: ex12
+	+					port:
+	+					  number: 3000
+		  defaultBackend:
+			service:
+			  name: ex12
+			  port:
+				number: 3000
+		status:
+		  loadBalancer: {}
+
+	ehosts
+	192.168.59.104 ex12.demo.com.local
+
+	curl http://ex12.demo.com.local
+
+	k describe ingress ex12
+
+	k delete all -l app=ex12
+
+using and configuring coredns
+
+	k get pods -n kube-system
+
+		NAME                               READY   STATUS    RESTARTS   AGE
++		coredns-64897985d-c682t            1/1     Running   0          35h
+		etcd-minikube                      1/1     Running   0          35h
+		kindnet-4l2l6                      1/1     Running   0          35h
+		kindnet-5g4jh                      1/1     Running   0          35h
+		kube-apiserver-minikube            1/1     Running   0          35h
+		kube-controller-manager-minikube   1/1     Running   0          35h
+		kube-proxy-cksrx                   1/1     Running   0          35h
+		kube-proxy-njwqw                   1/1     Running   0          35h
+		kube-proxy-qzz7z                   1/1     Running   0          35h
+		kube-scheduler-minikube            1/1     Running   0          35h
+		metrics-server-6b76bd68b6-kfrrg    1/1     Running   0          33h
+		storage-provisioner                1/1     Running   0          35h
+
+	k get pod coredns-64897985d-c682t -o yaml -n kube-system | grep -C 3 -i corefile
+		  containers:
+		  - args:
+			- -conf
++			- /etc/coredns/Corefile
+			image: k8s.gcr.io/coredns/coredns:v1.8.6
+			imagePullPolicy: IfNotPresent
+			livenessProbe:
+		--
+		  - configMap:
+			  defaultMode: 420	<=== 여기 앞에 spacing 주의. 아래 json 표현 참조. 헷갈려.
+			  items:
+			  - key: Corefile
+				path: Corefile
+			  name: coredns
+			name: config-volume
+		  - name: kube-api-access-mj6h6
+
+	k get pod coredns-64897985d-c682t -o json -n kube-system | grep -C 5 -i corefile
+		"spec": {
+			"containers": [
+				{
+					"args": [
+						"-conf",
+						"/etc/coredns/Corefile"
+					],
+					"image": "k8s.gcr.io/coredns/coredns:v1.8.6",
+					"imagePullPolicy": "IfNotPresent",
+					"livenessProbe": {
+						"failureThreshold": 5,
+	--
+				{
+					"configMap": {
+						"defaultMode": 420,
+						"items": [
+							{
+								"key": "Corefile",
+								"path": "Corefile"
+							}
+						],
+						"name": "coredns"
+					},
+					"name": "config-volume"
+
+	k get cm -n kube-system
+		NAME                                 DATA   AGE
+		coredns                              1      35h
+		extension-apiserver-authentication   6      35h
+		kube-proxy                           2      35h
+		kube-root-ca.crt                     1      35h
+		kubeadm-config                       1      35h
+		kubelet-config-1.23                  1      35h
+
+	k get cm coredns -n kube-system -o yaml
+		apiVersion: v1
+		data:
+		  Corefile: |
+			.:53 {
+				errors
+				health {
+				   lameduck 5s
+				}
+				ready
+				kubernetes cluster.local in-addr.arpa ip6.arpa {
+				   pods insecure
+				   fallthrough in-addr.arpa ip6.arpa
+				   ttl 30
+				}
+				prometheus :9153
+				hosts {
+				   192.168.59.1 host.minikube.internal
+				   fallthrough
+				}
+				forward . /etc/resolv.conf {
+				   max_concurrent 1000
+				}
+				cache 30
+				loop
+				reload
+				loadbalance
+			}
+		kind: ConfigMap
+		metadata:
+		  creationTimestamp: "2022-04-29T15:08:52Z"
+		  name: coredns
+		  namespace: kube-system
+		  resourceVersion: "368"
+		  uid: 70474739-eefa-44be-988e-6cb6bf0f5996
+
+	k get cm coredns -n kube-system -o json
+		{
+			"apiVersion": "v1",
+			"data": {
+				"Corefile": ".:53 {\n    errors\n    health {\n       lameduck 5s\n    }\n    ready\n    kubernetes cluster.local in-addr.arpa ip6.arpa {\n       pods insecure\n       fallthrough in-addr.arpa ip6.arpa\n       ttl 30\n    }\n    prometheus :9153\n    hosts {\n       192.168.59.1 host.minikube.internal\n       fallthrough\n    }\n    forward . /etc/resolv.conf {\n       max_concurrent 1000\n    }\n    cache 30\n    loop\n    reload\n    loadbalance\n}\n"
+			},
+			"kind": "ConfigMap",
+			"metadata": {
+				"creationTimestamp": "2022-04-29T15:08:52Z",
+				"name": "coredns",
+				"namespace": "kube-system",
+				"resourceVersion": "368",
+				"uid": "70474739-eefa-44be-988e-6cb6bf0f5996"
+			}
+		}
+
+customizing the coredns configuration
+
+	k apply -f coredns-edit.yaml
+
+	// coredns pod 재시작
+	k get pods -n kube-system
+	k delete pod coredns-64897985d-c682t -n kube-system
+
+dns for services
+
+resolving a service by hostname
+
+pod-to-service in the same namespace
+
+	k create ns ns422
+
+	k run echoservice --image=k8s.gcr.io/echoserver:1.10 --restart=Never --port=8080 --expose -n ns422
+
+	// 성공
+	k run curl --image=curlimages/curl -it --rm --restart=Never -n ns422 -- curl http://echoservice:8080
+
+	k delete ns ns422 --force
+
+pod-to-service from a different namespace
+
+	// echoservice를 준비
+	k create ns ns433
+
+	k run echoservice --image=k8s.gcr.io/echoserver:1.10 --restart=Never --port=8080 --expose -n ns433
+
+	k get all -n ns433
+
+	// 같은 ns 에서는 서비스명 echoservice이 hostname이 된다.
+	k run curl --image=curlimages/curl -it --rm --restart=Never -n ns433 -- curl http://echoservice:8080
+
+	// client 준비
+	k create ns ns437
+
+	// 실패
+	k run curl --image=curlimages/curl -it --rm --restart=Never -n ns437 -- curl http://echoservice:8080
+
+	// 성공
+	k run curl --image=curlimages/curl -it --rm --restart=Never -n ns437 -- curl http://echoservice.ns433:8080
+
+	// 성공
+	k run curl --image=curlimages/curl -it --rm --restart=Never -n ns437 -- curl http://echoservice.ns433.svc:8080
+
+	// 성공
+	k run curl --image=curlimages/curl -it --rm --restart=Never -n ns437 -- curl http://echoservice.ns433.svc.cluster.local:8080
+
+	k delete ns ns433 ns437 --force
+
+dns for pods
+
+	// coredns pod 안에 있는 /etc/dns/Corefile에 pods insecure 옵션을 설정하면 IP 10.0.0.85의 hostname이 10-0-0-85가 된다.
+
+	// echoservice를 준비
+	k create ns ns481
+	k config set-context ns481 --namespace=ns481
+	k config use-context ns481
+	k config current-context
+
+	k run echoservice --image=k8s.gcr.io/echoserver:1.10 --restart=Never --port=8080 --expose -n ns481
+
+	k get all -n ns481
+
+	// 같은 ns 에서는 서비스명 echoservice이 hostname이 된다.
+	k run curl --image=curlimages/curl -it --rm --restart=Never -n ns481 -- curl http://echoservice:8080
+
+	// client 준비
+	k create ns ns437
+
+	// 실패
+	k run curl --image=curlimages/curl -it --rm --restart=Never -n ns437 -- curl http://echoservice:8080
+
+	// 성공
+	k run curl --image=curlimages/curl -it --rm --restart=Never -n ns437 -- curl http://echoservice.ns433:8080
+
+	// 성공
+	k run curl --image=curlimages/curl -it --rm --restart=Never -n ns437 -- curl http://echoservice.ns433.svc:8080
+
+	// 성공
+	k run curl --image=curlimages/curl -it --rm --restart=Never -n ns437 -- curl http://echoservice.ns433.svc.cluster.local:8080
+
+choosing an appropriate CNI plugin
+
+	weaveworks
+	flannel
+	cannel
+	calico
+
+---- ex 5: how to configure probes ----
+
+	// create a demo container
+	k run hello --image=bmuschko/nodejs-hello-world:1.0.0 --port=3000 --dry-run=client -o yaml
+	apiVersion: v1
+	kind: Pod
+	metadata:
+	  creationTimestamp: null
+	  labels:
+		run: hello
+	  name: hello
+	spec:
+	  containers:
+	  - image: bmuschko/nodejs-hello-world:1.0.0
+		name: hello
+		ports:
+		- containerPort: 3000
+		  name: nodejs-port
+		resources: {}
+	  dnsPolicy: ClusterFirst
+	  restartPolicy: Always
+	status: {}
+
+	// enable probes
+	apiVersion: v1
+	kind: Pod
+	metadata:
+	  creationTimestamp: null
+	  labels:
+		run: hello
+	  name: hello
+	spec:
+	  containers:
+	  - image: bmuschko/nodejs-hello-world:1.0.0
+		name: hello
+		ports:
+		- containerPort: 3000
++		  name: nodejs-port
++		readinessProbe:
++		  httpGet:
++			path: /
++			port: nodejs-port
++		  initialDelaySeconds: 2
++		livenessProbe:
++		  httpGet:
++			path: /
++			port: nodejs-port
++		  initialDelaySeconds: 5
++		  periodSeconds: 8
+		resources: {}
+	  dnsPolicy: ClusterFirst
+	  restartPolicy: Always
+	status: {}
+
+	// check web response
+	k-bash hello
+	kubectl exec hello -it -- /bin/bash
+	root@hello:/usr/src/app# curl localhost:3000
+	Hello World
+
+	// check log
+	k-logs hello
+	kubectl logs -f hello
+	Magic happens on port 3000
+
+--- ex5 how to define pod resource requirements
+
+	https://github.com/bmuschko/ckad-crash-course/blob/master/exercises/05-defining-resource-requirements/solution/solution.md
+
+	k create namespace rq-demo
+
+	k create quota app --hard=pods=2,requests.cpu=2,requests.memory=500Mi --dry-run=client -o yaml > rq.yaml
+
+	apiVersion: v1
+	kind: ResourceQuota
+	metadata:
+	  creationTimestamp: null
+	  name: app
+	spec:
+	  hard:
+		pods: "2"
+		requests.cpu: "2"
+		requests.memory: 500Mi
+	status: {}
+
+	k apply -f rq.yaml -n rq-demo
+
+	k describe quota app -n rq-demo
+	Name:            app
+	Namespace:       rq-demo
+	Resource         Used  Hard
+	--------         ----  ----
+	pods             0     2
+	requests.cpu     0     2
+	requests.memory  0     500Mi
+
+	k run mypod --image=nginx --dry-run=client -o yaml > nginx-exceeding-quota.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: mypod
+  name: mypod
+spec:
+  containers:
+  - image: nginx
+    name: mypod
+    resources:
+      requests:
+        cpu: 0.5
+        memory: 501Mi
+  dnsPolicy: ClusterFirst
+  restartPolicy: Always
+status: {}
+
+k create -f nginx-exceeding-quota.yaml -n rq-demo
+Error from server (Forbidden): error when creating "nginx-exceeding-quota.yaml": pods "mypod" is forbidden: exceeded quota: app, requested: requests.memory=501Mi, used: requests.memory=0, limited: requests.memory=500Mi
+
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: mypod
+  name: mypod
+spec:
+  containers:
+  - image: nginx
+    name: mypod
+    resources:
+      requests:
+        cpu: 0.5
+        memory: 501Mi
+  dnsPolicy: ClusterFirst
+  restartPolicy: Always
+status: {}
+
+E:\Dropbox\src\cka-study-guide\ch05>k create -f nginx-exceeding-quota.yaml -n rq-demo
+pod/mypod created
+
+FIXME quota를 조정해서 501Mi를 받아주려고 했는데 그건 잘 안 되네.
+
+---- ex9 affinity demo
+
+	minikube-new
+
+	kubectl label nodes minikube-m02 color=m02 --overwrite
+
+	kubectl label nodes minikube-m03 color=m03 --overwrite
+
+k run mypod-m02 --image=nginx --dry-run=client -o yaml > pod-in-m02.yaml
+
+	apiVersion: v1
+	kind: Pod
+	metadata:
+	  creationTimestamp: null
+	  labels:
+		run: mypod
+	  name: mypod-m02
++	spec:
++	  affinity:
++		nodeAffinity:
++		  requiredDuringSchedulingIgnoredDuringExecution:
++			nodeSelectorTerms:
++			- matchExpressions:
++			  - key: color
++				operator: In
++				values:
++				- m02
+	  containers:
+	  - image: nginx
+		name: mypod
+		resources: {}
+	  dnsPolicy: ClusterFirst
+	  restartPolicy: Always
+	status: {}
+
+k run mypod-m03 --image=nginx --dry-run=client -o yaml > pod-in-m03.yaml
+
+	apiVersion: v1
+	kind: Pod
+	metadata:
+	  creationTimestamp: null
+	  labels:
+		run: mypod
+	  name: mypod-m02
++	spec:
++	  affinity:
++		nodeAffinity:
++		  requiredDuringSchedulingIgnoredDuringExecution:
++			nodeSelectorTerms:
++			- matchExpressions:
++			  - key: color
++				operator: In
++				values:
++				- m03
+	  containers:
+	  - image: nginx
+		name: mypod
+		resources: {}
+	  dnsPolicy: ClusterFirst
+	  restartPolicy: Always
+	status: {}
+
+	k create -f pod-in-m02.yaml
+	pod/mypod created
+
+	// pod was created in minikube-m02
+	k get pod/mypod -o wide
+	NAME    READY   STATUS              RESTARTS   AGE   IP       NODE           NOMINATED NODE   READINESS GATES
+	mypod   0/1     ContainerCreating   0          17s   <none>   minikube-m02   <none>           <none>
+
+	k create -f pod-in-m03.yaml
+	pod/mypod-m02 created
+
+	// pod was created in minikube-m03
+	k get pod mypod-m02 -o wide
+	NAME        READY   STATUS              RESTARTS   AGE   IP       NODE           NOMINATED NODE   READINESS GATES
+	mypod-m02   0/1     ContainerCreating   0          10s   <none>   minikube-m03   <none>           <none>
+
+	k delete pod mypod-m02 mypod-m03 --grace-period=0 --force
+
+---- ex10 taints
+
+	k get nodes
+	NAME           STATUS   ROLES                  AGE   VERSION
+	minikube       Ready    control-plane,master   22m   v1.23.3
+	minikube-m02   Ready    <none>                 19m   v1.23.3
+	minikube-m03   Ready    <none>                 17m   v1.23.3
+
+	k run nginx-ex10 --image=nginx
+
+	// running on m02
+	k get pod nginx-ex10 -o wide
+	NAME         READY   STATUS    RESTARTS   AGE   IP           NODE           NOMINATED NODE   READINESS GATES
+	nginx-ex10   1/1     Running   0          20s   10.244.1.3   minikube-m02   <none>           <none>
+
+	k taint node minikube-m02 exclusive=yes --overwrite
+
+	TODO
+
+using kubecl to access kubernetes api
+
+	start kubectl proxy --port=8080
+
+	curl http://localhost:8080/api/
+
+
+---- ex13 volume
+
+	// pv.yaml
+
+	kind: PersistentVolume
+	apiVersion: v1
+	metadata:
+	  name: pv
+	spec:
+	  capacity:
+		storage: 512m
+	  accessModes:
+		- ReadWriteMany
+	  hostPath:
+		path: //E/temp/test1
+
+	k create -f pv.yaml
+
+	k get pv pv
+	NAME   CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM   STORAGECLASS   REASON   AGE
+	pv     512m       RWX            Retain           Available                                   6s
+
+	// pvc.yaml
+	kind: PersistentVolumeClaim
+	apiVersion: v1
+	metadata:
+	  name: pvc
+	spec:
+	  accessModes:
+		- ReadWriteMany
+	  resources:
+		requests:
+		  storage: 256m
+
+	k create -f ex13-pvc.yaml
+
+	k get pvc pvc
+	NAME   STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+	pvc    Bound    pvc-1aa58d89-28ba-469b-a362-73ef35bc03ae   256m       RWX            standard       13s
+
+	// ex13-nginx.yaml
+	apiVersion: v1
+	kind: Pod
+	metadata:
+	  name: app
+	spec:
+	  containers:
+	  - image: nginx
+		name: app
+		volumeMounts:
+		- mountPath: "/data/app/config"
+		  name: configpvc
+	  volumes:
+	  - name: configpvc
+		persistentVolumeClaim:
+		  claimName: pvc
+	  restartPolicy: Never
+
+	k create -f ex13-nginx.yaml
+
+	dir /b e:\temp\test1
+
+	k-bash app
+	kubectl exec app -it -- /bin/bash
+	root@app:/# ls -l /data/app/config
+	total 0
+
+	echo created-by-pod > /data/app/config/file1-by-pod.txt
+
+	root@app:/# ls -l /data/app/config
+	total 4
+	-rw-r--r-- 1 root root 15 Apr 29 17:04 file1-by-pod.txt
+
+	// the file that was created by previous pod is still there.
+	k delete -f ex13-nginx.yaml --force
+	k create -f ex13-nginx.yaml
+	k-bash app
+	kubectl exec app -it -- /bin/bash
+	root@app:/# ls /data/app/config
+	file1-by-pod.txt <==== THIS
+
+---- metrics server
+
+E:\Dropbox\src\cka-study-guide>kubectl top nodes
+error: Metrics API not available
+
+e:\Dropbox\src\k8s\cka-crash-course>minikube addons enable metrics-server
+  - Using image k8s.gcr.io/metrics-server/metrics-server:v0.4.2
+* The 'metrics-server' addon is enabled
+
+E:\Dropbox\src\cka-study-guide>kubectl top nodes
+NAME           CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%
+minikube       405m         20%    1568Mi          20%
+minikube-m02   58m          2%     820Mi           10%
+minikube-m03   252m         12%    933Mi           11%
+
+---- ex14 troubleshooting
+
+Project: solution
+
+    mysql-pod.yaml
+        1: apiVersion: v1
+        2: kind: Pod
+        3: metadata:
+        4:   creationTimestamp: null
+        5:   labels:
+        6:     app: mysql-db
+        7:   name: mysql-db
+        8: spec:
+        9:   containers:
+       10:   - image: mysql:5.6
+       11:     name: mysql-db
+       12:     env:
+       13:     - name: MYSQL_ROOT_PASSWORD
+       14:       value: password
+       15:     ports:
+       16:     - containerPort: 3306
+       17:       protocol: TCP
+       18:     resources: {}
+       19:   dnsPolicy: ClusterFirst
+       20:   restartPolicy: Always
+       21: status: {}
+
+    mysql-service.yaml
+        1: apiVersion: v1
+        2: kind: Service
+        3: metadata:
+        4:   creationTimestamp: null
+        5:   labels:
+        6:     app: mysql-service
+        7:   name: mysql-service
+        8: spec:
+        9:   ports:
+       10:   - name: mysql-port
+       11:     port: 3306
+       12:     protocol: TCP
+       13:     targetPort: 3306
+       14:   selector:
+       15:     app: mysql-db
+       16:   type: ClusterIP
+       17: status:
+       18:   loadBalancer: {}
+
+    web-app-pod.yaml
+        1: apiVersion: v1
+        2: kind: Pod
+        3: metadata:
+        4:   creationTimestamp: null
+        5:   labels:
+        6:     app: web-app
+        7:   name: web-app
+        8: spec:
+        9:   containers:
+       10:   - image: bmuschko/web-app:1.0.1
+       11:     name: web-app
+       12:     env:
+       13:     - name: DB_HOST
+       14:       value: mysql-service
+       15:     - name: DB_USER
+       16:       value: root
+       17:     - name: DB_PASSWORD
+       18:       value: password
+       19:     ports:
+       20:     - containerPort: 3000
+       21:       protocol: TCP
+       22:     resources: {}
+       23:   dnsPolicy: ClusterFirst
+       24:   restartPolicy: Always
+       25: status: {}
+
+    web-app-service.yaml
+        1: apiVersion: v1
+        2: kind: Service
+        3: metadata:
+        4:   creationTimestamp: null
+        5:   labels:
+        6:     app: web-app-service
+        7:   name: web-app-service
+        8: spec:
+        9:   ports:
+       10:   - name: web-app-port
+       11:     port: 3000
+       12:     protocol: TCP
+       13:     targetPort: 3000
+       14:   selector:
+       15:     app: web-app
+       16:   type: NodePort
+       17: status:
+       18:   loadBalancer: {}
+
+
+	k create ns gemini
+
+	k create -f mysql-pod.yaml -n gemini
+
+	k create -f mysql-service.yaml -n gemini
+
+	k create -f web-app-pod.yaml -n gemini
+
+	k create -f web-app-service.yaml -n gemini
+
+	k get all -n gemini -o wide
+	NAME           READY   STATUS    RESTARTS   AGE     IP            NODE           NOMINATED NODE   READINESS GATES
+	pod/mysql-db   1/1     Running   0          3m49s   10.244.2.15   minikube-m03   <none>           <none>
+	pod/web-app    1/1     Running   0          3m34s   10.244.2.16   minikube-m03   <none>           <none>
+
+	NAME                      TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)          AGE     SELECTOR
+	service/mysql-service     ClusterIP   10.105.113.226   <none>        3306/TCP         3m43s   app=mysql-db
+	service/web-app-service   NodePort    10.104.36.95     <none>        3000:32165/TCP   3m28s   app=web-app
+
+	curl minikube-m03:32165
+	Successfully connected to database!
+
+	// check
+	k describe svc/mysql-service -n gemini | grep -i selector
+	Selector:          app=mysql-db
+
+	k describe service/web-app-service -n gemini | grep -i selector
+	Selector:                 app=web-app
+
+	k get pods -n gemini -o wide --show-labels
+	NAME       READY   STATUS    RESTARTS   AGE   IP            NODE           NOMINATED NODE   READINESS GATES   LABELS
+	mysql-db   1/1     Running   0          10m   10.244.2.15   minikube-m03   <none>           <none>            app=mysql-db
+	web-app    1/1     Running   0          10m   10.244.2.16   minikube-m03   <none>           <none>            app=web-app

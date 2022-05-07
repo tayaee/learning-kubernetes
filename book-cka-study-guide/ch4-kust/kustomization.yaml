@@ -1,0 +1,6 @@
+namespace: persistence
+commonLabels:
+  team: helix
+resources:
+- nginx-deployment.yaml
+- nginx-service.yaml
