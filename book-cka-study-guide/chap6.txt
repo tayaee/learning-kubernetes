@@ -1,0 +1,508 @@
+chapter 6. storage
+
+understanding volumes
+
+volume types
+
+	emptyDir
+	hostPath
+	configMap, secret
+	nfs
+	persistentVolumeClaim
+
+creating and accessing volumes
+
+	k run pod business-app --image=nginx --dry-run=client -o yaml > ex.6.1.yaml
+
+		apiVersion: v1
+		kind: Pod
+		metadata:
+		  creationTimestamp: null
+		  labels:
+			run: pod
+		  name: pod
+		spec:
+		  containers:
+		  - args:
+			- business-app
+			image: nginx
+			name: pod
+			resources: {}
+		  dnsPolicy: ClusterFirst
+		  restartPolicy: Always
+		status: {}
+
+	e ex.6.1.yaml
+
+		apiVersion: v1
+		kind: Pod
+		metadata:
+		  creationTimestamp: null
+		  labels:
+			run: business-app
+		  name: business-app
+		spec:
++		  volumes:
++		  - name: logs-volume
++			emptyDir: {}
+		  containers:
+		  - image: nginx
+			name: business-app
+			resources: {}
++			volumeMounts:
++			- mountPath: /var/logs
++			  name: logs-volume
+		  dnsPolicy: ClusterFirst
+		  restartPolicy: Always
+		status: {}
+
+	k-bash business-app
+
+		ls -l /var/logs
+		echo one > /var/logs/app1.log
+		ls -l /var/logs/app1.log
+
+understanding persistent volumes
+
+	pod
+		container
+			/var/data -- pvc -- pv
+
+static vs. dynamic provisioning
+
+	.spec.storageClassName
+
+creating persistent volumes
+
+	type db-pv.yaml
+		apiVersion: v1
+		kind: PersistentVolume
++		metadata:
++		  name: db-pv
+		spec:
++		  hostPath:
++			path: //e/temp/db
++		  accessModes:
++			- ReadWriteOnce
++		  capacity:
++			storage: 1Gi
+
+	k create -f db-pv.yaml
+
+	k describe pv db-pv
+
+		Name:            db-pv
+		Labels:          <none>
+		Annotations:     <none>
+		Finalizers:      [kubernetes.io/pv-protection]
+		StorageClass:
+		Status:          Available
+		Claim:
+		Reclaim Policy:  Retain
+		Access Modes:    RWO
+		VolumeMode:      Filesystem
+		Capacity:        1Gi
+		Node Affinity:   <none>
+		Message:
+		Source:
+			Type:          HostPath (bare host directory volume)
+			Path:          //e/temp/db
+			HostPathType:
+		Events:            <none>
+
+	k get pv db-pv
+
+		NAME     CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM   STORAGECLASS   REASON   AGE
+		db-pv   1Gi        RWO            Retain           Available                                   2m
+
+	k get pv db-pv -o wide
+		NAME     CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM   STORAGECLASS   REASON   AGE    VOLUMEMODE
+		db-pv   1Gi        RWO            Retain           Available                                   4m7s   Filesystem
+
+	k get pv db-pv -o json
+		{
+			"apiVersion": "v1",
+			"kind": "PersistentVolume",
+			"metadata": {
+				"creationTimestamp": "2022-05-08T03:10:21Z",
+				"finalizers": [
+					"kubernetes.io/pv-protection"
+				],
+				"name": "db-pv",
+				"resourceVersion": "211408",
+				"uid": "809d6aa5-2ff8-44f2-b111-1c4edde35ede"
+			},
+			"spec": {
+				"accessModes": [
+					"ReadWriteOnce"
+				],
+				"capacity": {
+					"storage": "1Gi"
+				},
+				"hostPath": {
+					"path": "//e/temp/db",
+					"type": ""
+				},
+				"persistentVolumeReclaimPolicy": "Retain",
+				"volumeMode": "Filesystem"
+			},
+			"status": {
+				"phase": "Available"
+			}
+		}
+
+	k get pv db-pv -o yaml
+		apiVersion: v1
+		kind: PersistentVolume
++		metadata:
+		  creationTimestamp: "2022-05-08T03:10:21Z"
+		  finalizers:
+		  - kubernetes.io/pv-protection
++		  name: db-pv
+		  resourceVersion: "211408"
+		  uid: 809d6aa5-2ff8-44f2-b111-1c4edde35ede
+		spec:
++		  accessModes:
++		  - ReadWriteOnce
++		  capacity:
++			storage: 1Gi
++		  hostPath:
++			path: //e/temp/db
+			type: ""
+		  persistentVolumeReclaimPolicy: Retain
+		  volumeMode: Filesystem
+		status:
+		  phase: Available
+
+configuration options for a pv
+
+volume mode
+
+	spec:
+		volumeMode: <value>
+
+	<value>:
+		Filesystem
+		Block
+
+access mode
+
+	spec:
+		accessModes:
+		- <value>
+
+	<value>:
+		ReadWriteOncePod or RWOP	싱글 Pod rw
+		ReadWriteOnce or RWO		싱글 노드 rw
+		ReadOnlyMany or ROX			여러 노드 ro
+		ReadWriteMany or RWX		여러 노드 rw
+
+reclaim policy
+
+	spec:
+		persistentVolumeReclaimPolicy: <value>
+
+	<value>:
+		Retain - pvc가 삭제될 때 pv가 reclaim 된다
+		Delete
+		Recycle - deprecated
+
+	k get pv -o wide
+		NAME    CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM            STORAGECLASS   REASON   AGE   VOLUMEMODE
+		db-pv   1Gi        RWO            Retain           Bound    default/db-pvc
+
+	k get pv db-pv -o jsonpath={.spec}
+		{"accessModes":["ReadWriteOnce"],"capacity":{"storage":"1Gi"},"hostPath":{"path":"//e/temp/db","type":""},"persistentVolumeReclaimPolicy":"Retain","volumeMode":"Filesystem"}
+
+	k get pv db-pv -o jsonpath={.spec.persistentVolumeReclaimPolicy}
+		Retain
+
+	k get pv db-pv -o json | jq -r .spec
+		{
+		  "accessModes": [
+			"ReadWriteOnce"
+		  ],
+		  "capacity": {
+			"storage": "1Gi"
+		  },
+		  "hostPath": {
+			"path": "//e/temp/db",
+			"type": ""
+		  },
+		  "persistentVolumeReclaimPolicy": "Retain",
+		  "volumeMode": "Filesystem"
+		}
+
+	k get pv db-pv -o json | jq .spec.persistentVolumeReclaimPolicy
+		"Retain"
+
+	k get pv db-pv -o json | jq -r .spec.persistentVolumeReclaimPolicy
+		Retain
+
+creating pvc
+
+	// db-pvc.yaml
+	apiVersion: v1
+	kind: PersistentVolumeClaim
+	metadata:
+	  name: db-pvc
+	spec:
+	  accessModes:
+		- ReadWriteOnce
+	  storageClassName: ""
+	  resources:
+		requests:
+		  storage: 256Mi
+
+	k create -f db-pvc.yaml
+
+	k get pvc -o wide
+		NAME     STATUS   VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   AGE   VOLUMEMODE
+		db-pvc   Bound    db-pv    1Gi        RWO                           13s   Filesystem
+
+	k describe pvc db-pvc
+		Name:          db-pvc
+		Namespace:     default
+		StorageClass:
+		Status:        Bound
+		Volume:        pv0003
+		Labels:        <none>
+		Annotations:   pv.kubernetes.io/bind-completed: yes
+					   pv.kubernetes.io/bound-by-controller: yes
+		Finalizers:    [kubernetes.io/pvc-protection]
+		Capacity:      1Gi
+		Access Modes:  RWO
+		VolumeMode:    Filesystem
++		Used By:       <none>
+		Events:        <none>
+
+mounting pvc in a pod
+
+	k run app-consuming-pvc --image=alpine --dry-run=client -o yaml > app-consuming-pvc.yaml
+		apiVersion: v1
+		kind: Pod
+		metadata:
+		  creationTimestamp: null
+		  labels:
+			run: app-consuming-pvc
+		  name: app-consuming-pvc
+		spec:
+		  containers:
+		  - image: alpine
+			name: app-consuming-pvc
+			resources: {}
+		  dnsPolicy: ClusterFirst
+		  restartPolicy: Always
+		status: {}
+
+	e app-consuming-pvc.yaml
+
+		apiVersion: v1
+		kind: Pod
+		metadata:
+		  creationTimestamp: null
+		  labels:
+			run: app-consuming-pvc
+		  name: app-consuming-pvc
+		spec:
+		  containers:
+		  - name: app-consuming-pvc
+			image: alpine
++			command: ["/bin/sh"]
++			args: ["-c", "while true; do sleep 60; done;"]
++			volumeMounts:
++			  - name: app-storage
++				mountPath: "/mnt/data"
++		  volumes:
++			- name: app-storage
++			  persistentVolumeClaim:
++				claimName: db-pvc
+
+	k get pod -o wide
+		NAME                READY   STATUS    RESTARTS   AGE   IP           NODE       NOMINATED NODE   READINESS GATES
+		app-consuming-pvc   1/1     Running   0          15m   172.17.0.5   minikube   <none>           <none>
+		business-app        1/1     Running   0          23h   172.17.0.3   minikube   <none>           <none>
+
+	k describe pod app-consuming-pvc
+		Name:         app-consuming-pvc
+		Namespace:    default
+		Priority:     0
+		Node:         minikube/192.168.49.2
+		Start Time:   Sun, 08 May 2022 00:00:50 -0400
+		Labels:       run=app-consuming-pvc
+		Annotations:  <none>
+		Status:       Running
+		IP:           172.17.0.5
+		IPs:
+		  IP:  172.17.0.5
+		Containers:
+		  app-consuming-pvc:
+			Container ID:  docker://821a4c46e2a15357b7834da539f884f664a10f90496e67831f0fb0d622023472
+			Image:         alpine
+			Image ID:      docker-pullable://alpine@sha256:4edbd2beb5f78b1014028f4fbb99f3237d9561100b6881aabbf5acce2c4f9454
+			Port:          <none>
+			Host Port:     <none>
+			Command:
+			  /bin/sh
+			Args:
+			  -c
+			  while true; do sleep 60; done;
+			State:          Running
+			  Started:      Sun, 08 May 2022 00:00:52 -0400
+			Ready:          True
+			Restart Count:  0
+			Environment:    <none>
+			Mounts:
+			  /mnt/data from app-storage (rw)
+			  /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-8csf6 (ro)
+		Conditions:
+		  Type              Status
+		  Initialized       True
+		  Ready             True
+		  ContainersReady   True
+		  PodScheduled      True
+		Volumes:
++		  app-storage:
++			Type:       PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
++			ClaimName:  db-pvc
++			ReadOnly:   false
+		  kube-api-access-8csf6:
+			Type:                    Projected (a volume that contains injected data from multiple sources)
+			TokenExpirationSeconds:  3607
+			ConfigMapName:           kube-root-ca.crt
+			ConfigMapOptional:       <nil>
+			DownwardAPI:             true
+		QoS Class:                   BestEffort
+		Node-Selectors:              <none>
+		Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+									 node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+		Events:
+		  Type    Reason     Age   From               Message
+		  ----    ------     ----  ----               -------
+		  Normal  Scheduled  14m   default-scheduler  Successfully assigned default/app-consuming-pvc to minikube
+		  Normal  Pulling    14m   kubelet            Pulling image "alpine"
+		  Normal  Pulled     14m   kubelet            Successfully pulled image "alpine" in 1.195715381s
+		  Normal  Created    14m   kubelet            Created container app-consuming-pvc
+		  Normal  Started    14m   kubelet            Started container app-consuming-pvc
+
+	k describe pvc db-pvc
+		Name:          db-pvc
+		Namespace:     default
+		StorageClass:
+		Status:        Bound
+		Volume:        db-pv
+		Labels:        <none>
+		Annotations:   pv.kubernetes.io/bind-completed: yes
+					   pv.kubernetes.io/bound-by-controller: yes
+		Finalizers:    [kubernetes.io/pvc-protection]
+		Capacity:      1Gi
+		Access Modes:  RWO
+		VolumeMode:    Filesystem
++		Used By:       app-consuming-pvc
+		Events:        <none>
+
+	k delete -f app-consuming-pvc.yaml
+	pod "app-consuming-pvc" deleted
+
+	k create -f app-consuming-pvc.yaml
+	pod/app-consuming-pvc created
+
+	// pod가 재생성되어도 pv가 삭제되지 않았다.
+	kubectl exec app-consuming-pvc -it -- ls -l /mnt/data
+	total 4
+	-rw-r--r--    1 root     root            29 May  8 04:21 one.txt
+
+understanding storage classes
+
+	k api-resources | grep class
+		ingressclasses                                 networking.k8s.io/v1                   false        IngressClass
+		runtimeclasses                                 node.k8s.io/v1                         false        RuntimeClass
+		priorityclasses                   pc           scheduling.k8s.io/v1                   false        PriorityClass
++		storageclasses                    sc           storage.k8s.io/v1                      false        StorageClass
+
+	// minikube 클러스터에 'standard'라는 이름의 클래스는 기본 존재함.
+	k get sc
+		NAME                 PROVISIONER                RECLAIMPOLICY   VOLUMEBINDINGMODE   ALLOWVOLUMEEXPANSION   AGE
++		standard (default)   k8s.io/minikube-hostpath   Delete          Immediate           false                  2d23h
+
+creating sc
+
+	// fast-sc.yaml
+		apiVersion: storage.k8s.io/v1
+		kind: StorageClass
+		metadata:
+		  name: fast-sc
+		provisioner: kubernetes.io/gce-pd
+		parameters:
+		  type: pd-ssd
+		  replication-type: regional-pd
+
+	k create -f fast-sc.yaml
+		storageclass.storage.k8s.io/fast-sc created
+
+	k get sc
+		NAME                 PROVISIONER                RECLAIMPOLICY   VOLUMEBINDINGMODE   ALLOWVOLUMEEXPANSION   AGE
+		fast-sc              kubernetes.io/gce-pd       Delete          Immediate           false                  4s
+		standard (default)   k8s.io/minikube-hostpath   Delete          Immediate           false                  3d15h
+
+	k get sc fast-sc -o yaml
+		apiVersion: storage.k8s.io/v1
++		kind: StorageClass
+		metadata:
+		  creationTimestamp: "2022-05-08T20:07:48Z"
++		  name: fast-sc
+		  resourceVersion: "262307"
+		  uid: 5e1ac34b-3f6d-4671-95eb-f0a106f0c2ab
++		parameters:
++		  replication-type: regional-pd
++		  type: pd-ssd
+		provisioner: kubernetes.io/gce-pd
+		reclaimPolicy: Delete
+		volumeBindingMode: Immediate
+
+	k get sc fast-sc -o json
+		{
+			"apiVersion": "storage.k8s.io/v1",
+			"kind": "StorageClass",
+			"metadata": {
+				"creationTimestamp": "2022-05-08T20:07:48Z",
+				"name": "fast-sc",
+				"resourceVersion": "262307",
+				"uid": "5e1ac34b-3f6d-4671-95eb-f0a106f0c2ab"
+			},
+			"parameters": {
+				"replication-type": "regional-pd",
+				"type": "pd-ssd"
+			},
+			"provisioner": "kubernetes.io/gce-pd",
+			"reclaimPolicy": "Delete",
+			"volumeBindingMode": "Immediate"
+		}
+
+using sc
+
+	// db-pvc2.yaml
+		apiVersion: v1
+		kind: PersistentVolumeClaim
+		metadata:
+		  name: db-pvc2
+		spec:
+		  accessModes:
+			- ReadWriteOnce
+		  storageClassName: standard
+		  resources:
+			requests:
+			  storage: 256Mi
+
+
+	k create -f db-pvc2.yaml
+		persistentvolumeclaim/db-pvc2 created
+
+	k get pv,pvc
+		NAME                                                        CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM             STORAGECLASS   REASON   AGE
+		persistentvolume/db-pv                                      1Gi        RWO            Retain           Bound    default/db-pvc                            16h
+		persistentvolume/pvc-2ee99a33-7330-499b-b956-017f3bba3e06   256Mi      RWO            Delete           Bound    default/db-pvc2   standard                5s
+
+		NAME                            STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+		persistentvolumeclaim/db-pvc    Bound    db-pv                                      1Gi        RWO                           16h
+		persistentvolumeclaim/db-pvc2   Bound    pvc-2ee99a33-7330-499b-b956-017f3bba3e06   256Mi      RWO            standard       5s
