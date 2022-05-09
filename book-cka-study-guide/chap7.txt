@@ -1,0 +1,398 @@
+chapter 7 troubleshooting
+
+cluster logging
+
+	node level logging agent
+	sidecar container
+	pushing the log
+
+using a node logging agent
+
+	cluster
+		node
+			pod
+				app-container --(create)--> log-file
+			pod
+				logging-agent-container --(read)--> log-file
+				logging-agent-container --(write)--> external-logging-backend
+			logrotate --(rotate)--> log-file
+			log-file
+	external
+		external-logging-backend
+
+
+using a sidecar container
+
+	cluster
+		node
+			pod
+				app-container
+				streaming-sidecar-container --(read log)--> app-container
+				streaming-sidecar-container --(create)--> log-file
+			pod
+				logging-agent-container --(read)--> log-file
+				logging-agent-container --(write)--> external-logging-backend
+			logrotate --(rotate)--> log-file
+			log-file
+	external
+		external-logging-backend
+
+pushing directly to logging backend
+
+	cluster
+		node
+			pod
+				app-container --(write)--> external-logging-backend
+	external
+		external-logging-backend
+
+	k get pod -n kube-system
+
+	k logs
+
+	k logs kube-scheduler-minikube -n kube-system
+
+	k logs kube-proxy-j6j9r -n kube-system
+
+monitoring cluster components and applications
+
+	prometheus
+	datadog
+
+	minikube addons list | grep metrics-server
+
+	minikube addons enable metrics-server
+
+	k top nodes
+	NAME       CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%
+	minikube   172m         2%     10Mi            0%
+
+	k top node
+	NAME       CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%
+	minikube   172m         2%     10Mi            0%
+
+	k top no
+	NAME       CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%
+	minikube   172m         2%     10Mi            0%
+
+	k top node minikube
+	NAME       CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%
+	minikube   175m         2%     10Mi            0%
+
+nginx on a single pod
+	k run nginx1 --image=nginx --port=80
+	kubectl exec nginx1 -- /bin/sh -c "echo `date` Nginx 1 pod 1 running on `hostname`:80 > /usr/share/nginx/html/index.html"
+
+	1
+	k get all --show-labels -l app=nginx2
+	k get pod nginx1 -o json | jq -r .status.podIP
+	k exec pod/nginx1 -it -- curl localhost:80
+
+	2
+	k run curl --image=curlimages/curl -it --rm --restart=Never curl 172.17.0.10:80
+
+	3
+	k run curl --image=curlimages/curl -it --rm --restart=Never -n kube-system curl 172.17.0.10:80
+
+	4
+	start k port-forward pods/nginx1 8081:80
+	curl http://localhost:8081
+
+nginx on a pod and scale up to 3
+	k create deployment nginx2 --image=nginx --port=80
+	k scale deployment nginx2 --replicas=3
+	k get all --show-labels -l app=nginx2
+	kubectl exec pod/nginx2-57774bb9bf-h5ldg -- /bin/sh -c "echo `date` Nginx 2 pod 1 running on `hostname`:80 > /usr/share/nginx/html/index.html"
+
+	1
+	k exec pod/nginx2-57774bb9bf-h5ldg -it -- curl localhost:80
+
+	2
+	k get pods -o wide -l app=nginx2
+	k run curl --image=curlimages/curl -it --rm --restart=Never curl 172.17.0.11:80
+
+	3
+	k run curl --image=curlimages/curl -it --rm --restart=Never -n kube-system curl 172.17.0.11:80
+
+	4
+	start k port-forward deployment/nginx2 8082:80
+	curl http://localhost:8082
+
+nginx on multiple pods
+
+	k create deployment nginx3 --image=nginx --port=80 --replicas=3
+	k get all -l app=nginx3 -o wide
+		NAME                          READY   STATUS    RESTARTS   AGE     IP            NODE       NOMINATED NODE   READINESS GATES
+		pod/nginx3-59475d8756-4t786   1/1     Running   0          6m38s   172.17.0.13   minikube   <none>           <none>
+		pod/nginx3-59475d8756-95plg   1/1     Running   0          6m38s   172.17.0.14   minikube   <none>           <none>
+		pod/nginx3-59475d8756-wsfxg   1/1     Running   0          6m38s   172.17.0.12   minikube   <none>           <none>
+
+	kubectl exec pod/nginx3-59475d8756-4t786 -- /bin/sh -c "echo `date` Nginx 3 pod 1 running on `hostname`:80 > /usr/share/nginx/html/index.html"
+	kubectl exec pod/nginx3-59475d8756-95plg -- /bin/sh -c "echo `date` Nginx 3 pod 2 running on `hostname`:80 > /usr/share/nginx/html/index.html"
+	kubectl exec pod/nginx3-59475d8756-wsfxg -- /bin/sh -c "echo `date` Nginx 3 pod 3 running on `hostname`:80 > /usr/share/nginx/html/index.html"
+
+	1
+	k exec pod/nginx3-59475d8756-4t786 -it -- curl localhost:80
+	k exec pod/nginx3-59475d8756-95plg -it -- curl localhost:80
+	k exec pod/nginx3-59475d8756-wsfxg -it -- curl localhost:80
+
+	2
+	k run curl --image=curlimages/curl -it --rm --restart=Never curl 172.17.0.13:80
+	k run curl --image=curlimages/curl -it --rm --restart=Never curl 172.17.0.14:80
+	k run curl --image=curlimages/curl -it --rm --restart=Never curl 172.17.0.12:80
+
+	3
+	k run curl --image=curlimages/curl -it --rm --restart=Never -n kube-system curl 172.17.0.13:80
+	k run curl --image=curlimages/curl -it --rm --restart=Never -n kube-system curl 172.17.0.14:80
+	k run curl --image=curlimages/curl -it --rm --restart=Never -n kube-system curl 172.17.0.12:80
+
+	4
+	k expose deployment nginx3 --port=8080
+	k get rs -l app=nginx3 -o wide
+		NAME                DESIRED   CURRENT   READY   AGE   CONTAINERS   IMAGES   SELECTOR
+		nginx3-59475d8756   3         3         3       13m   nginx        nginx    app=nginx3,pod-template-hash=59475d8756
+	start k port-forward replicaset/nginx3-59475d8756 8083:80  // load balancing 없이 첫 pod와 연결됨, 첫 pod 죽으면 proxy 다시 실행해야 함
+	curl http://localhost:8083
+
+nginx running on a service (still clusterip)
+
+	k create deployment nginx4 --image=nginx --port=80 --replicas=3
+	k expose deployment nginx4 --port=80
+	start k port-forward service/nginx4 8084:80
+
+	k get all -o wide -l app=nginx4
+		NAME                         READY   STATUS    RESTARTS   AGE     IP            NODE       NOMINATED NODE   READINESS GATES
+		pod/nginx4-cd6c66495-688mj   1/1     Running   0          6m29s   172.17.0.17   minikube   <none>           <none>
+		pod/nginx4-cd6c66495-9tg6q   1/1     Running   0          3m32s   172.17.0.16   minikube   <none>           <none>
+		pod/nginx4-cd6c66495-d8hv8   1/1     Running   0          6m29s   172.17.0.15   minikube   <none>           <none>
+
+		NAME             TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)   AGE     SELECTOR
+		service/nginx4   ClusterIP   10.100.172.197   <none>        80/TCP    6m21s   app=nginx4
+
+		NAME                     READY   UP-TO-DATE   AVAILABLE   AGE     CONTAINERS   IMAGES   SELECTOR
+		deployment.apps/nginx4   3/3     3            3           6m29s   nginx        nginx    app=nginx4
+
+		NAME                               DESIRED   CURRENT   READY   AGE     CONTAINERS   IMAGES   SELECTOR
+		replicaset.apps/nginx4-cd6c66495   3         3         3       6m29s   nginx        nginx    app=nginx4,pod-template-hash=cd6c66495
+
+	kubectl exec pod/nginx4-cd6c66495-688mj -- /bin/sh -c "echo `date` Nginx 4 pod 1 running on `hostname`:80 > /usr/share/nginx/html/index.html"
+	kubectl exec pod/nginx4-cd6c66495-8wsgh -- /bin/sh -c "echo `date` Nginx 4 pod 2 running on `hostname`:80 > /usr/share/nginx/html/index.html"
+	kubectl exec pod/nginx4-cd6c66495-d8hv8 -- /bin/sh -c "echo `date` Nginx 4 pod 3 running on `hostname`:80 > /usr/share/nginx/html/index.html"
+
+	1
+	k exec pod/nginx4-cd6c66495-688mj -it -- curl localhost:80
+
+	2
+	k run curl --image=curlimages/curl -it --rm --restart=Never curl 172.17.0.17:80
+
+	3
+	k run curl --image=curlimages/curl -it --rm --restart=Never -n kube-system curl 172.17.0.17:80
+
+	4
+	curl http://localhost:8084  // load balancing 없이 첫 pod와 연결됨
+
+nginx running on a service (NodePort)
+
+	k create deployment nginx5 --image=nginx --port=80 --replicas=3
+	k expose deployment nginx5 --port=80 --type=NodePort
+	start k port-forward service/nginx5 8085:80
+
+	k get all -o wide -l app=nginx5
+		NAME                          READY   STATUS    RESTARTS   AGE   IP            NODE       NOMINATED NODE   READINESS GATES
+		pod/nginx5-754df67998-8d47v   1/1     Running   0          24s   172.17.0.20   minikube   <none>           <none>
+		pod/nginx5-754df67998-mmxzv   1/1     Running   0          24s   172.17.0.18   minikube   <none>           <none>
+		pod/nginx5-754df67998-tc2jq   1/1     Running   0          24s   172.17.0.19   minikube   <none>           <none>
+
+		NAME             TYPE       CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE   SELECTOR
+		service/nginx5   NodePort   10.107.229.61   <none>        80:31583/TCP   20s   app=nginx5
+
+		NAME                     READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES   SELECTOR
+		deployment.apps/nginx5   3/3     3            3           24s   nginx        nginx    app=nginx5
+
+		NAME                                DESIRED   CURRENT   READY   AGE   CONTAINERS   IMAGES   SELECTOR
+		replicaset.apps/nginx5-754df67998   3         3         3       24s   nginx        nginx    app=nginx5,pod-template-hash=754df67998
+
+	k get node -o wide
+		NAME       STATUS   ROLES                  AGE     VERSION   INTERNAL-IP    EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION         CONTAINER-RUNTIME
+		minikube   Ready    control-plane,master   3d19h   v1.23.3   192.168.49.2   <none>        Ubuntu 20.04.2 LTS   4.19.130-boot2docker   docker://20.10.12
+
+	kubectl exec pod/nginx5-754df67998-8d47v -- /bin/sh -c "echo `date` Nginx 5 pod 1 running on `hostname`:80 > /usr/share/nginx/html/index.html"
+	kubectl exec pod/nginx5-754df67998-mmxzv -- /bin/sh -c "echo `date` Nginx 5 pod 2 running on `hostname`:80 > /usr/share/nginx/html/index.html"
+	kubectl exec pod/nginx5-754df67998-tc2jq -- /bin/sh -c "echo `date` Nginx 5 pod 3 running on `hostname`:80 > /usr/share/nginx/html/index.html"
+
+	1
+	k exec pod/nginx5-754df67998-8d47v -it -- curl localhost:80
+
+	2
+	k run curl --image=curlimages/curl -it --rm --restart=Never curl 172.17.0.20:80
+
+	3
+	k run curl --image=curlimages/curl -it --rm --restart=Never -n kube-system curl 172.17.0.20:80
+
+	4
+	k run curl --image=curlimages/curl -it --rm --restart=Never -n kube-system -- /bin/sh
+	curl 10.107.229.61:80  // load balancing이 됨.
+
+	5
+	curl http://192.168.49.2:31583  // 어 왜 load balancing이 안 되지?
+
+	6
+	curl http://localhost:8085  // load balancing 없이 첫 pod와 연결됨
+
+----
+
+	k top nodes
+
+	k top pod --namespace=default
+
+	k top pod -l app=nginx5
+
+troubleshooting application failures
+
+troubleshooting pods
+
+retrieving high-level information
+
+	k get all -o wide --show-labels
+
+inspecting events
+
+	k get pods
+
+	k describe pod POD-NAME
+
+	k get events
+
+inspecting logs
+
+	k logs POD-NAME
+
+	k logs POD-NAME -f
+
+opening an interactive shell
+
+	k logs POD-NAME
+
+	k exec POD-NAME -it -- /bin/sh
+
+
+troubleshooting services
+
+	// 레이블 검사
+	k describe service SVC-NAME
+
+	// 레이블 브라우징
+	k get all --show-labels
+
+	// 특정 레이블로 필터링
+	k get all -l app=nginx4
+
+	k get endpoints
+
+	서비스의 targetPort와 pod의 containerPort의 값이 같아야 한다.
+
+
+troublehsooting cluster failures
+
+	k get nodes
+
+	-n kube-system
+
+troubleshooting control plane nodes
+
+rendering cluster information
+
+	k cluster-info
+
+	k cluster-info dump
+
+inspecting control plane components
+
+	alias k='kubectl $*'
+	alias ka='kubectl get all -o wide --showlabel $*'
+	alias kn='kubectl $* -n kube-system'
+
+	ka -n kube-system
+
+	kn get all
+	kubectl get all -n kube-system
+		NAME                                   READY   STATUS    RESTARTS        AGE
++		pod/coredns-64897985d-xfwwl            1/1     Running   0               3d20h
++		pod/etcd-minikube                      1/1     Running   0               3d20h
++		pod/kube-apiserver-minikube            1/1     Running   0               3d20h
++		pod/kube-controller-manager-minikube   1/1     Running   0               3d20h
++		pod/kube-proxy-j6j9r                   1/1     Running   0               3d20h
++		pod/kube-scheduler-minikube            1/1     Running   0               3d20h
++		pod/metrics-server-6b76bd68b6-xlvph    1/1     Running   0               4h59m
+		pod/storage-provisioner                1/1     Running   1 (3d20h ago)   3d20h
+
+		NAME                     TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                  AGE
+		service/kube-dns         ClusterIP   10.96.0.10       <none>        53/UDP,53/TCP,9153/TCP   3d20h
+		service/metrics-server   ClusterIP   10.107.191.192   <none>        443/TCP                  4h59m
+
+		NAME                        DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR            AGE
+		daemonset.apps/kube-proxy   1         1         1       1            1           kubernetes.io/os=linux   3d20h
+
+		NAME                             READY   UP-TO-DATE   AVAILABLE   AGE
+		deployment.apps/coredns          1/1     1            1           3d20h
+		deployment.apps/metrics-server   1/1     1            1           4h59m
+
+		NAME                                        DESIRED   CURRENT   READY   AGE
+		replicaset.apps/coredns-64897985d           1         1         1       3d20h
+		replicaset.apps/metrics-server-6b76bd68b6   1         1         1       4h59m
+
+	kn logs pod/kube-apiserver-minikube
+
+
+troubleshooting worker nodes
+
+	k get nodes
+
+	worker node 자체로 ssh 하여 점검
+
+checking available resources
+
+	k describe nodes minikube
+
+	minikube ssh
+
+	minikube ssh --help
+
+	minikube ssh --node=minikube
+
+	df -h
+
+	top
+
+checking the kubelet process
+
+	systemctl status kubelet
+
+	sudo journalctl -u kubelet.service
+
+	sudo systemctl restart kubelet
+
+checking the certificate
+
+	openssl x509 -in /var/lib/kubelet/pki/kubelet.crt -text
+
+checking the kube-proxy pod
+
+	kn get pods
+
+e:\Dropbox\src\k8s\learning-kubernetes\book-cka-study-guide>kubectl get pods -n kube-system
+NAME                               READY   STATUS    RESTARTS        AGE
+coredns-64897985d-xfwwl            1/1     Running   0               3d20h
+etcd-minikube                      1/1     Running   0               3d20h
+kube-apiserver-minikube            1/1     Running   0               3d20h
+kube-controller-manager-minikube   1/1     Running   0               3d20h
+kube-proxy-j6j9r                   1/1     Running   0               3d20h
+kube-scheduler-minikube            1/1     Running   0               3d20h
+metrics-server-6b76bd68b6-xlvph    1/1     Running   0               5h9m
+storage-provisioner                1/1     Running   1 (3d20h ago)   3d20h
+
+	kn describe pod kube-proxy-j6j9r
+
+	kn get daemonset
+	kn get ds
+	kn describe ds kube-proxy
