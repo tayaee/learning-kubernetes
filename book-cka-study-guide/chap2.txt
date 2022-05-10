@@ -18,13 +18,17 @@ authn strategies
 
 create a cert for user
 
-	1	mkdir cert && cd cert
+	1	mkdir cert
+		cd cert
 
-	2	openssl genrsa -out johndoe.key 2048   // output: johndoe.key
+	2	// output: johndoe.key
+		openssl genrsa -out johndoe.key 2048
 
-	3	openssl req -new -key johndoe.key -out johndoe.csr -subj "/CN=johndoe/O=cka-study-guide"   // output: johndoe.csr
+	3	// output: johndoe.csr
+		openssl req -new -key johndoe.key -out johndoe.csr -subj "/CN=johndoe/O=cka-study-guide"
 
-	4	openssl x509 -req -in johndoe.csr -CA %userprofile%/.minikube/ca.crt -CAkey %userprofile%/.minikube/ca.key -out johndoe.crt -CAcreateserial -days 364   // output: johndoe.crt
+	4	// output: johndoe.crt
+		openssl x509 -req -in johndoe.csr -CA %userprofile%/.minikube/ca.crt -CAkey %userprofile%/.minikube/ca.key -out johndoe.crt -CAcreateserial -days 364
 
 	5	k config set-credentials johndoe --client-certificate=johndoe.crt --client-key=johndoe.key
 		k config set-context johndoe-context --cluster=minikube --user=johndoe
@@ -51,7 +55,7 @@ service account
 	// secrets
 	k get secrets
 
-	// assigning sa to pod (--serviceaccount will be removed in 1.24)
+	// assigning service account to pod (--serviceaccount will be removed in 1.24)
 	k run build-observer --image=alpine --restart=Never --serviceaccount=build-bot
 
 understanding rbac
@@ -70,73 +74,73 @@ default clusterrole
 	view
 
 	k get clusterrole
-	NAME                                                                   CREATED AT
-	admin                                                                  2022-04-14T00:46:59Z
-	cluster-admin                                                          2022-04-14T00:46:59Z
-	edit                                                                   2022-04-14T00:47:00Z
-	kubeadm:get-nodes                                                      2022-04-14T00:47:04Z
-	system:aggregate-to-admin                                              2022-04-14T00:47:00Z
-	system:aggregate-to-edit                                               2022-04-14T00:47:00Z
-	system:aggregate-to-view                                               2022-04-14T00:47:00Z
-	system:auth-delegator                                                  2022-04-14T00:47:00Z
-	system:basic-user                                                      2022-04-14T00:46:59Z
-	system:certificates.k8s.io:certificatesigningrequests:nodeclient       2022-04-14T00:47:00Z
-	system:certificates.k8s.io:certificatesigningrequests:selfnodeclient   2022-04-14T00:47:00Z
-	system:certificates.k8s.io:kube-apiserver-client-approver              2022-04-14T00:47:01Z
-	system:certificates.k8s.io:kube-apiserver-client-kubelet-approver      2022-04-14T00:47:01Z
-	system:certificates.k8s.io:kubelet-serving-approver                    2022-04-14T00:47:01Z
-	system:certificates.k8s.io:legacy-unknown-approver                     2022-04-14T00:47:01Z
-	system:controller:attachdetach-controller                              2022-04-14T00:47:01Z
-	system:controller:certificate-controller                               2022-04-14T00:47:01Z
-	system:controller:clusterrole-aggregation-controller                   2022-04-14T00:47:01Z
-	system:controller:cronjob-controller                                   2022-04-14T00:47:01Z
-	system:controller:daemon-set-controller                                2022-04-14T00:47:01Z
-	system:controller:deployment-controller                                2022-04-14T00:47:01Z
-	system:controller:disruption-controller                                2022-04-14T00:47:01Z
-	system:controller:endpoint-controller                                  2022-04-14T00:47:01Z
-	system:controller:endpointslice-controller                             2022-04-14T00:47:01Z
-	system:controller:endpointslicemirroring-controller                    2022-04-14T00:47:01Z
-	system:controller:ephemeral-volume-controller                          2022-04-14T00:47:01Z
-	system:controller:expand-controller                                    2022-04-14T00:47:01Z
-	system:controller:generic-garbage-collector                            2022-04-14T00:47:01Z
-	system:controller:horizontal-pod-autoscaler                            2022-04-14T00:47:01Z
-	system:controller:job-controller                                       2022-04-14T00:47:01Z
-	system:controller:namespace-controller                                 2022-04-14T00:47:01Z
-	system:controller:node-controller                                      2022-04-14T00:47:01Z
-	system:controller:persistent-volume-binder                             2022-04-14T00:47:01Z
-	system:controller:pod-garbage-collector                                2022-04-14T00:47:01Z
-	system:controller:pv-protection-controller                             2022-04-14T00:47:01Z
-	system:controller:pvc-protection-controller                            2022-04-14T00:47:01Z
-	system:controller:replicaset-controller                                2022-04-14T00:47:01Z
-	system:controller:replication-controller                               2022-04-14T00:47:01Z
-	system:controller:resourcequota-controller                             2022-04-14T00:47:01Z
-	system:controller:root-ca-cert-publisher                               2022-04-14T00:47:02Z
-	system:controller:route-controller                                     2022-04-14T00:47:01Z
-	system:controller:service-account-controller                           2022-04-14T00:47:01Z
-	system:controller:service-controller                                   2022-04-14T00:47:01Z
-	system:controller:statefulset-controller                               2022-04-14T00:47:01Z
-	system:controller:ttl-after-finished-controller                        2022-04-14T00:47:01Z
-	system:controller:ttl-controller                                       2022-04-14T00:47:01Z
-	system:coredns                                                         2022-04-14T00:47:05Z
-	system:discovery                                                       2022-04-14T00:46:59Z
-	system:heapster                                                        2022-04-14T00:47:00Z
-	system:kube-aggregator                                                 2022-04-14T00:47:00Z
-	system:kube-controller-manager                                         2022-04-14T00:47:00Z
-	system:kube-dns                                                        2022-04-14T00:47:00Z
-	system:kube-scheduler                                                  2022-04-14T00:47:01Z
-	system:kubelet-api-admin                                               2022-04-14T00:47:00Z
-	system:monitoring                                                      2022-04-14T00:46:59Z
-	system:node                                                            2022-04-14T00:47:00Z
-	system:node-bootstrapper                                               2022-04-14T00:47:00Z
-	system:node-problem-detector                                           2022-04-14T00:47:00Z
-	system:node-proxier                                                    2022-04-14T00:47:01Z
-	system:persistent-volume-provisioner                                   2022-04-14T00:47:00Z
-	system:public-info-viewer                                              2022-04-14T00:46:59Z
-	system:service-account-issuer-discovery                                2022-04-14T00:47:01Z
-	system:volume-scheduler                                                2022-04-14T00:47:00Z
-	view                                                                   2022-04-14T00:47:00Z
+		NAME                                                                   CREATED AT
+		admin                                                                  2022-04-14T00:46:59Z
+		cluster-admin                                                          2022-04-14T00:46:59Z
+		edit                                                                   2022-04-14T00:47:00Z
+		kubeadm:get-nodes                                                      2022-04-14T00:47:04Z
+		system:aggregate-to-admin                                              2022-04-14T00:47:00Z
+		system:aggregate-to-edit                                               2022-04-14T00:47:00Z
+		system:aggregate-to-view                                               2022-04-14T00:47:00Z
+		system:auth-delegator                                                  2022-04-14T00:47:00Z
+		system:basic-user                                                      2022-04-14T00:46:59Z
+		system:certificates.k8s.io:certificatesigningrequests:nodeclient       2022-04-14T00:47:00Z
+		system:certificates.k8s.io:certificatesigningrequests:selfnodeclient   2022-04-14T00:47:00Z
+		system:certificates.k8s.io:kube-apiserver-client-approver              2022-04-14T00:47:01Z
+		system:certificates.k8s.io:kube-apiserver-client-kubelet-approver      2022-04-14T00:47:01Z
+		system:certificates.k8s.io:kubelet-serving-approver                    2022-04-14T00:47:01Z
+		system:certificates.k8s.io:legacy-unknown-approver                     2022-04-14T00:47:01Z
+		system:controller:attachdetach-controller                              2022-04-14T00:47:01Z
+		system:controller:certificate-controller                               2022-04-14T00:47:01Z
+		system:controller:clusterrole-aggregation-controller                   2022-04-14T00:47:01Z
+		system:controller:cronjob-controller                                   2022-04-14T00:47:01Z
+		system:controller:daemon-set-controller                                2022-04-14T00:47:01Z
+		system:controller:deployment-controller                                2022-04-14T00:47:01Z
+		system:controller:disruption-controller                                2022-04-14T00:47:01Z
+		system:controller:endpoint-controller                                  2022-04-14T00:47:01Z
+		system:controller:endpointslice-controller                             2022-04-14T00:47:01Z
+		system:controller:endpointslicemirroring-controller                    2022-04-14T00:47:01Z
+		system:controller:ephemeral-volume-controller                          2022-04-14T00:47:01Z
+		system:controller:expand-controller                                    2022-04-14T00:47:01Z
+		system:controller:generic-garbage-collector                            2022-04-14T00:47:01Z
+		system:controller:horizontal-pod-autoscaler                            2022-04-14T00:47:01Z
+		system:controller:job-controller                                       2022-04-14T00:47:01Z
+		system:controller:namespace-controller                                 2022-04-14T00:47:01Z
+		system:controller:node-controller                                      2022-04-14T00:47:01Z
+		system:controller:persistent-volume-binder                             2022-04-14T00:47:01Z
+		system:controller:pod-garbage-collector                                2022-04-14T00:47:01Z
+		system:controller:pv-protection-controller                             2022-04-14T00:47:01Z
+		system:controller:pvc-protection-controller                            2022-04-14T00:47:01Z
+		system:controller:replicaset-controller                                2022-04-14T00:47:01Z
+		system:controller:replication-controller                               2022-04-14T00:47:01Z
+		system:controller:resourcequota-controller                             2022-04-14T00:47:01Z
+		system:controller:root-ca-cert-publisher                               2022-04-14T00:47:02Z
+		system:controller:route-controller                                     2022-04-14T00:47:01Z
+		system:controller:service-account-controller                           2022-04-14T00:47:01Z
+		system:controller:service-controller                                   2022-04-14T00:47:01Z
+		system:controller:statefulset-controller                               2022-04-14T00:47:01Z
+		system:controller:ttl-after-finished-controller                        2022-04-14T00:47:01Z
+		system:controller:ttl-controller                                       2022-04-14T00:47:01Z
+		system:coredns                                                         2022-04-14T00:47:05Z
+		system:discovery                                                       2022-04-14T00:46:59Z
+		system:heapster                                                        2022-04-14T00:47:00Z
+		system:kube-aggregator                                                 2022-04-14T00:47:00Z
+		system:kube-controller-manager                                         2022-04-14T00:47:00Z
+		system:kube-dns                                                        2022-04-14T00:47:00Z
+		system:kube-scheduler                                                  2022-04-14T00:47:01Z
+		system:kubelet-api-admin                                               2022-04-14T00:47:00Z
+		system:monitoring                                                      2022-04-14T00:46:59Z
+		system:node                                                            2022-04-14T00:47:00Z
+		system:node-bootstrapper                                               2022-04-14T00:47:00Z
+		system:node-problem-detector                                           2022-04-14T00:47:00Z
+		system:node-proxier                                                    2022-04-14T00:47:01Z
+		system:persistent-volume-provisioner                                   2022-04-14T00:47:00Z
+		system:public-info-viewer                                              2022-04-14T00:46:59Z
+		system:service-account-issuer-discovery                                2022-04-14T00:47:01Z
+		system:volume-scheduler                                                2022-04-14T00:47:00Z
+		view                                                                   2022-04-14T00:47:00Z
 
-	// create roles (role <=> resources)
+	// role - verb - resource
 	k create role read-only --verb=list,get,watch --resource=pods,deployments,services
 
 	// listing roles
@@ -158,7 +162,7 @@ default clusterrole
 	  services          []                 []              [list get watch]
 	  deployments.apps  []                 []              [list get watch]
 
-	// create rolebindings (role <=> user)
+	// user -- rolebinding -- role -- verb -- resource
 	k create rolebinding read-only-binding --role=read-only --user=johndoe
 
 	// list rolebindings
@@ -185,60 +189,60 @@ seeing the rbac rules in effect
 
 	k config use-context johndoe-context
 
-	k get deployments   // Expected: normal result. Actual: prompt username and password
+	k get deployments			// expected: normal result. actual: prompt username and password
 
-	k get replicasets   // Expected: Forbidden error. Actual: prompt username and password
+	k get replicasets			// expected: forbidden error. actual: prompt username and password
 
-	k delete deployment myapp   // Expected: Forbidden error. Actual: prompt username and password
+	k delete deployment myapp   // expected: forbidden error. actual: prompt username and password
 
 checking all permissions
 
 	k auth can-i --list
-	Resources                                       Non-Resource URLs   Resource Names   Verbs
-	*.*                                             []                  []               [*]
-													[*]                 []               [*]
-	selfsubjectaccessreviews.authorization.k8s.io   []                  []               [create]
-	selfsubjectrulesreviews.authorization.k8s.io    []                  []               [create]
-													[/api/*]            []               [get]
-													[/api]              []               [get]
-													[/apis/*]           []               [get]
-													[/apis]             []               [get]
-													[/healthz]          []               [get]
-													[/healthz]          []               [get]
-													[/livez]            []               [get]
-													[/livez]            []               [get]
-													[/openapi/*]        []               [get]
-													[/openapi]          []               [get]
-													[/readyz]           []               [get]
-													[/readyz]           []               [get]
-													[/version/]         []               [get]
-													[/version/]         []               [get]
-													[/version]          []               [get]
-													[/version]          []               [get]
+		Resources                                       Non-Resource URLs   Resource Names   Verbs
+		*.*                                             []                  []               [*]
+														[*]                 []               [*]
+		selfsubjectaccessreviews.authorization.k8s.io   []                  []               [create]
+		selfsubjectrulesreviews.authorization.k8s.io    []                  []               [create]
+														[/api/*]            []               [get]
+														[/api]              []               [get]
+														[/apis/*]           []               [get]
+														[/apis]             []               [get]
+														[/healthz]          []               [get]
+														[/healthz]          []               [get]
+														[/livez]            []               [get]
+														[/livez]            []               [get]
+														[/openapi/*]        []               [get]
+														[/openapi]          []               [get]
+														[/readyz]           []               [get]
+														[/readyz]           []               [get]
+														[/version/]         []               [get]
+														[/version/]         []               [get]
+														[/version]          []               [get]
+														[/version]          []               [get]
 
 	k auth can-i --list --as johndoe
-	Resources                                       Non-Resource URLs   Resource Names   Verbs
-	selfsubjectaccessreviews.authorization.k8s.io   []                  []               [create]
-	selfsubjectrulesreviews.authorization.k8s.io    []                  []               [create]
-													[/api/*]            []               [get]
-													[/api]              []               [get]
-													[/apis/*]           []               [get]
-													[/apis]             []               [get]
-													[/healthz]          []               [get]
-													[/healthz]          []               [get]
-													[/livez]            []               [get]
-													[/livez]            []               [get]
-													[/openapi/*]        []               [get]
-													[/openapi]          []               [get]
-													[/readyz]           []               [get]
-													[/readyz]           []               [get]
-													[/version/]         []               [get]
-													[/version/]         []               [get]
-													[/version]          []               [get]
-													[/version]          []               [get]
-	pods                                            []                  []               [list get watch]
-	services                                        []                  []               [list get watch]
-	deployments.apps                                []                  []               [list get watch]
+		Resources                                       Non-Resource URLs   Resource Names   Verbs
+		selfsubjectaccessreviews.authorization.k8s.io   []                  []               [create]
+		selfsubjectrulesreviews.authorization.k8s.io    []                  []               [create]
+														[/api/*]            []               [get]
+														[/api]              []               [get]
+														[/apis/*]           []               [get]
+														[/apis]             []               [get]
+														[/healthz]          []               [get]
+														[/healthz]          []               [get]
+														[/livez]            []               [get]
+														[/livez]            []               [get]
+														[/openapi/*]        []               [get]
+														[/openapi]          []               [get]
+														[/readyz]           []               [get]
+														[/readyz]           []               [get]
+														[/version/]         []               [get]
+														[/version/]         []               [get]
+														[/version]          []               [get]
+														[/version]          []               [get]
+		pods                                            []                  []               [list get watch]
+		services                                        []                  []               [list get watch]
+		deployments.apps                                []                  []               [list get watch]
 
 
 	k auth can-i list pods --as johndoe
@@ -262,144 +266,152 @@ aggregating rbac rules
 
 rule 1
 
-	k create clusterrole list-pods --verb=list --resource=pods  -n rbac-example
+	k create clusterrole list-pods --verb=list --resource=pods -n rbac-example
 
 	k get clusterrole list-pods -o yaml
-	apiVersion: rbac.authorization.k8s.io/v1
-	kind: ClusterRole
-	metadata:
-	  creationTimestamp: "2022-04-20T23:34:48Z"
-	  name: list-pods
-	  resourceVersion: "416094"
-	  uid: 2b5f074a-44ba-499a-8b44-7928f601531b
-	rules:
-	- apiGroups:
-	  - ""
-	  resources:
-	  - pods
-	  verbs:
-	  - list
+		apiVersion: rbac.authorization.k8s.io/v1
+		kind: ClusterRole
+		metadata:
+		  creationTimestamp: "2022-04-20T23:34:48Z"
+		  name: list-pods
+		  resourceVersion: "416094"
+		  uid: 2b5f074a-44ba-499a-8b44-7928f601531b
+		rules:
+		- apiGroups:
+		  - ""
+		  resources:
++		  - pods
+		  verbs:
++		  - list
 
 	k edit clusterrole list-pods
-	clusterrole.rbac.authorization.k8s.io/list-pods edited
 
 	k get clusterrole list-pods -o yaml
-	apiVersion: rbac.authorization.k8s.io/v1
-	kind: ClusterRole
-	metadata:
-	  creationTimestamp: "2022-04-20T23:34:48Z"
-+	  labels:
-+		rbac-pod-list: "true"
-	  name: list-pods
-	  resourceVersion: "416094"
-	  uid: 2b5f074a-44ba-499a-8b44-7928f601531b
-	rules:
-	- apiGroups:
-	  - ""
-	  resources:
-	  - pods
-	  verbs:
-	  - list
+
+		apiVersion: rbac.authorization.k8s.io/v1
+		kind: ClusterRole
+		metadata:
+		  creationTimestamp: "2022-04-20T23:34:48Z"
++		  labels:
++			rbac-pod-list: "true"
+		  name: list-pods
+		  resourceVersion: "416094"
+		  uid: 2b5f074a-44ba-499a-8b44-7928f601531b
+		rules:
+		- apiGroups:
+		  - ""
+		  resources:
+		  - pods
+		  verbs:
+		  - list
 
 	k describe clusterrole list-pods
-	Name:         list-pods
-	Labels:       rback-pod-list=true
-	Annotations:  <none>
-	PolicyRule:
-	  Resources  Non-Resource URLs  Resource Names  Verbs
-	  ---------  -----------------  --------------  -----
-	  pods       []                 []              [list]
+
+		Name:         list-pods
+		Labels:       rback-pod-list=true
+		Annotations:  <none>
+		PolicyRule:
+		  Resources  Non-Resource URLs  Resource Names  Verbs
+		  ---------  -----------------  --------------  -----
+		  pods       []                 []              [list]
 
 rule 2
 
 	k create clusterrole delete-services --verb=delete --resource=services -n rbac-example
 
 	k get clusterrole delete-services -o yaml
-	apiVersion: rbac.authorization.k8s.io/v1
-	kind: ClusterRole
-	metadata:
-	  creationTimestamp: "2022-04-20T23:39:48Z"
-	  name: delete-services
-	  resourceVersion: "416274"
-	  uid: cf80129c-7139-454a-8db0-9de13c5bad7b
-	rules:
-	- apiGroups:
-	  - ""
-	  resources:
-	  - services
-	  verbs:
-	  - delete
+
+		apiVersion: rbac.authorization.k8s.io/v1
+		kind: ClusterRole
+		metadata:
+		  creationTimestamp: "2022-04-20T23:39:48Z"
+		  name: delete-services
+		  resourceVersion: "416274"
+		  uid: cf80129c-7139-454a-8db0-9de13c5bad7b
+		rules:
+		- apiGroups:
+		  - ""
+		  resources:
+		  - services
+		  verbs:
+		  - delete
 
 	k edit clusterrole delete-services
 
 	k get clusterrole delete-services -o yaml
-	apiVersion: rbac.authorization.k8s.io/v1
-	kind: ClusterRole
-	metadata:
-	  creationTimestamp: "2022-04-20T23:39:48Z"
-+	  labels:
-+		rbac-service-delete: "true"
-	  name: delete-services
-	  resourceVersion: "416374"
-	  uid: cf80129c-7139-454a-8db0-9de13c5bad7b
-	rules:
-	- apiGroups:
-	  - ""
-	  resources:
-	  - services
-	  verbs:
-	  - delete
+
+		apiVersion: rbac.authorization.k8s.io/v1
+		kind: ClusterRole
+		metadata:
+		  creationTimestamp: "2022-04-20T23:39:48Z"
++		  labels:
++			rbac-service-delete: "true"
+		  name: delete-services
+		  resourceVersion: "416374"
+		  uid: cf80129c-7139-454a-8db0-9de13c5bad7b
+		rules:
+		- apiGroups:
+		  - ""
+		  resources:
+		  - services
+		  verbs:
+		  - delete
 
 aggregated rule 3
 
 	k create clusterrole pods-services-aggregation-rules --aggregation-rule="rbac-pod-list=true" --aggregation-rule="rbac-service-delete=true" -n rbac-example --dry-run=client -o yaml
-	aggregationRule:
-	  clusterRoleSelectors:
-	  - matchLabels:
-		  rbac-pod-list: "true"
-		  rbac-service-delete: "true"
-	apiVersion: rbac.authorization.k8s.io/v1
-	kind: ClusterRole
-	metadata:
-	  creationTimestamp: null
-	  name: pods-services-aggregation-rules
-	rules: null
 
-	k describe clusterrole pods-services-aggregation-rules -n rbac-example
-	Name:         pods-services-aggregation-rules
-	Labels:       <none>
-	Annotations:  <none>
-	PolicyRule:
-	  Resources  Non-Resource URLs  Resource Names  Verbs
-	  ---------  -----------------  --------------  -----
+		aggregationRule:
+		  clusterRoleSelectors:
++		  - matchLabels:
++			  rbac-pod-list: "true"
++			  rbac-service-delete: "true"
+		apiVersion: rbac.authorization.k8s.io/v1
+		kind: ClusterRole
+		metadata:
+		  creationTimestamp: null
+		  name: pods-services-aggregation-rules
+		rules: null
+
+		k describe clusterrole pods-services-aggregation-rules -n rbac-example
+		Name:         pods-services-aggregation-rules
+		Labels:       <none>
+		Annotations:  <none>
+		PolicyRule:
+		  Resources  Non-Resource URLs  Resource Names  Verbs
+		  ---------  -----------------  --------------  -----
 
 	k edit clusterrole pods-services-aggregation-rules -o yaml
 
 	k get clusterrole pods-services-aggregation-rules -o yaml
-	aggregationRule:
-	  clusterRoleSelectors:
-	  - matchLabels:
-		  rbac-pod-list: "true"
-+	  - matchLabels:
-		  rbac-service-delete: "true"
-	apiVersion: rbac.authorization.k8s.io/v1
-	kind: ClusterRole
-	metadata:
-	  creationTimestamp: "2022-04-20T23:49:03Z"
-	  name: pods-services-aggregation-rules
-	  resourceVersion: "416660"
-	  uid: e85aacc4-e99e-40a0-abfb-31b82a1cce92
-	rules: null
+
+		aggregationRule:
+		  clusterRoleSelectors:
++		  - matchLabels:
++			  rbac-pod-list: "true"
++		  - matchLabels:
++			  rbac-service-delete: "true"
+		apiVersion: rbac.authorization.k8s.io/v1
+		kind: ClusterRole
+		metadata:
+		  creationTimestamp: "2022-04-20T23:49:03Z"
+		  name: pods-services-aggregation-rules
+		  resourceVersion: "416660"
+		  uid: e85aacc4-e99e-40a0-abfb-31b82a1cce92
+		rules: null
 
 	k describe clusterrole pods-services-aggregation-rules -n rbac-example
-	Name:         pods-services-aggregation-rules
-	Labels:       <none>
-	Annotations:  <none>
-	PolicyRule:
-	  Resources  Non-Resource URLs  Resource Names  Verbs
-	  ---------  -----------------  --------------  -----
-	  services   []                 []              [delete]
-	  pods       []                 []              [list]
+
+		Name:         pods-services-aggregation-rules
+		Labels:       <none>
+		Annotations:  <none>
+		PolicyRule:
+		  Resources  Non-Resource URLs  Resource Names  Verbs
+		  ---------  -----------------  --------------  -----
+		  services   []                 []              [delete]
+		  pods       []                 []              [list]
+
+cluster architecture 1 of 4
 
 creating and managing a kubernetes cluster ('kubeadm join' was not successful though)
 
@@ -407,15 +419,16 @@ creating and managing a kubernetes cluster ('kubeadm join' was not successful th
 	--------			--------			--------
 	kubeadm
 	cri-o
+	kubeadm init
 						kubeadm
 						cri-o
-	kubeadm init
 						kubeadm join
 											kubeadm
 											cri-o
 											kubeadm join
 
-#1
+설치 시도 #1
+
 	# ubuntu 20.04, cri-o, 1 master, 2 worker, pod-network-cidr=10.244.0.0/16
 	# https://computingforgeeks.com/deploy-kubernetes-cluster-on-ubuntu-with-kubeadm/
 
@@ -565,33 +578,37 @@ creating and managing a kubernetes cluster ('kubeadm join' was not successful th
 	  --token sr4l2l.2kvot0pfalh5o4ik \
 	  --discovery-token-ca-cert-hash sha256:c692fb047e15883b575bd6710779dc2c5af8073f7cab460abd181fd3ddb29a18
 
+cluster architecture 2 of 4
+
 managing a highly-available cluster
 
 	master-lb
 		master01
 		master02
-		master03
 	worker01
 	worker02
-	worker03
 
 	master01			master02			worker01			worker02
 	--------			--------			--------			--------
 	kubeadm
 	cri-o
+	kubeadm init
 											kubeadm
 											cri-o
-	kubeadm init
 											kubeadm join
 																kubeadm
 																cri-o
 																kubeadm join
 						kubeadm join
 
+	on master02:
+
 	kubeadm join k8s-master01:6443 \
 		--token sr4l2l.2kvot0pfalh5o4ik \
 		--discovery-token-ca-cert-hash sha256:c692fb047e15883b575bd6710779dc2c5af8073f7cab460abd181fd3ddb29a18 \
-		--control-plane
++		--control-plane
+
+cluster architecture 3 of 3
 
 external etcd topology
 
@@ -678,22 +695,23 @@ upgrading a cluster version
 backing up and restoring etcd
 
 	etcd01
+
 	etcd02
 
 #1 on kube-master
 
 	sudo apt update
+
 	sudo apt install -y etcd-client
 
 	etcdctl version
 
-	// get etcd pod name: etcd-kube-master
 	kubectl get pod -n kube-system
 
 		NAME                                   READY   STATUS    RESTARTS   AGE
 		coredns-64897985d-t9rxz                0/1     Pending   0          85m
 		coredns-64897985d-zjtxq                0/1     Pending   0          85m
-		etcd-k8s-master01                      1/1     Running   0          85m <==
++		etcd-k8s-master01                      1/1     Running   0          85m <==
 		kube-apiserver-k8s-master01            1/1     Running   0          85m
 		kube-controller-manager-k8s-master01   1/1     Running   0          85m
 		kube-proxy-kbn7v                       1/1     Running   0          85m
@@ -704,12 +722,12 @@ backing up and restoring etcd
 		Command:
 			  etcd
 			  --advertise-client-urls=https://10.0.2.15:2379
-			  --cert-file=/etc/kubernetes/pki/etcd/server.crt
++			  --cert-file=/etc/kubernetes/pki/etcd/server.crt
 			  --client-cert-auth=true
 			  --data-dir=/var/lib/etcd
 			  --initial-advertise-peer-urls=https://10.0.2.15:2380
 			  --initial-cluster=k8s-master01=https://10.0.2.15:2380
-			  --key-file=/etc/kubernetes/pki/etcd/server.key
++			  --key-file=/etc/kubernetes/pki/etcd/server.key
 			  --listen-client-urls=https://127.0.0.1:2379,https://10.0.2.15:2379
 			  --listen-metrics-urls=http://127.0.0.1:2381
 			  --listen-peer-urls=https://10.0.2.15:2380
@@ -719,9 +737,13 @@ backing up and restoring etcd
 			  --peer-key-file=/etc/kubernetes/pki/etcd/peer.key
 			  --peer-trusted-ca-file=/etc/kubernetes/pki/etcd/ca.crt
 			  --snapshot-count=10000
-			  --trusted-ca-file=/etc/kubernetes/pki/etcd/ca.crt
++			  --trusted-ca-file=/etc/kubernetes/pki/etcd/ca.crt
 
-	sudo ETCDCTL_API=3 etcdctl --cacert=/etc/kubernetes/pki/etcd/ca.crt --cert=/etc/kubernetes/pki/etcd/server.crt --key=/etc/kubernetes/pki/etcd/server.key snapshot save /opt/etcd-backup.db
+	sudo ETCDCTL_API=3 etcdctl \
++		--cacert=/etc/kubernetes/pki/etcd/ca.crt \
++		--cert=/etc/kubernetes/pki/etcd/server.crt \
++		--key=/etc/kubernetes/pki/etcd/server.key \
+		snapshot save /opt/etcd-backup.db
 
 #2 restoring etcd
 
@@ -741,3 +763,166 @@ backing up and restoring etcd
 
 	백업본으로는 pod 상태가 Running이 안 되네. 계속 Pending 이었음. 구성 원복했음.
 
+sample excercise
+
+	1
+		k create ns apps
+		k create serviceaccount api-access -n apps
+
+	2
+		k create clusterrole api-clusterrole --verb=watch,list,get --resources=pods	 // x
+		k create clusterrole api-clusterrole --verb=watch,list,get --resource=pods
+
+		k create clusterrolebinding api-clusterrolebinding --serviceaccount=api-access --role=api-clusterrole  // x
+		k create clusterrolebinding api-clusterrolebinding --serviceaccount=apps:api-access --clusterrole=api-clusterrole
+
+	3
+		k create pod operator --image=nginx:1.21.1 --port=80 -n apps --serviceaccount=apps:api-access  // x
+		k run operator --image=nginx:1.21.1 --restart=Never --port=80 --serviceaccount=api-access -n apps
+			Flag --serviceaccount has been deprecated, has no effect and will be removed in 1.24.
+
+		k create ns rm
+
+		k create pod disposable --image=nginx:1.21.1 --port=80 -n rm  // x
+		k run disposable --image=nginx:1.21.1 --restart=Never -n rm
+
+	4
+		k config view -o json
+
+			{
+				"kind": "Config",
+				"apiVersion": "v1",
+				"preferences": {},
+				"clusters": [
+					{
+						"name": "kind-linkerd",
+						"cluster": {
+							"server": "https://127.0.0.1:7722",
+							"certificate-authority-data": "DATA+OMITTED"
+						}
+					},
+					{
+						"name": "minikube",
+						"cluster": {
++							"server": "https://192.168.99.100:32769",
+							"certificate-authority": "C:\\Users\\Soonki\\.minikube\\ca.crt",
+							"extensions": [
+								{
+									"name": "cluster_info",
+									"extension": {
+										"last-update": "Thu, 05 May 2022 00:51:28 EDT",
+										"provider": "minikube.sigs.k8s.io",
+										"version": "v1.25.2"
+									}
+								}
+							]
+						}
+					}
+				],
+				"users": [
+					{
+						"name": "johndoe",
+						"user": {
+							"client-certificate": "johndoe.crt",
+							"client-key": "johndoe.key"
+						}
+					},
+					{
+						"name": "kind-linkerd",
+						"user": {
+							"client-certificate-data": "REDACTED",
+							"client-key-data": "REDACTED"
+						}
+					},
+					{
+						"name": "minikube",
+						"user": {
+							"client-certificate": "C:\\Users\\Soonki\\.minikube\\profiles\\minikube\\client.crt",
+							"client-key": "C:\\Users\\Soonki\\.minikube\\profiles\\minikube\\client.key"
+						}
+					}
+				],
+				"contexts": [
+					{
+						"name": "johndoe-context",
+						"context": {
+							"cluster": "minikube",
+							"user": "johndoe"
+						}
+					},
+					{
+						"name": "kind-linkerd",
+						"context": {
+							"cluster": "kind-linkerd",
+							"user": "kind-linkerd"
+						}
+					},
+					{
+						"name": "minikube",
+						"context": {
+							"cluster": "minikube",
+							"user": "minikube",
+							"namespace": "default",
+							"extensions": [
+								{
+									"name": "context_info",
+									"extension": {
+										"last-update": "Thu, 05 May 2022 00:51:28 EDT",
+										"provider": "minikube.sigs.k8s.io",
+										"version": "v1.25.2"
+									}
+								}
+							]
+						}
+					},
+					{
+						"name": "ns481",
+						"context": {
+							"cluster": "",
+							"user": "",
+							"namespace": "ns481"
+						}
+					}
+				],
+				"current-context": "minikube"
+			}
+
+		k config view -o json | jq -r .clusters[].cluster.server
+
+			https://127.0.0.1:7722
++			https://192.168.99.100:32769
+
+		k get serviceaccount api-access -n apps -o json
+
+			{
+				"apiVersion": "v1",
+				"kind": "ServiceAccount",
+				"metadata": {
+					"creationTimestamp": "2022-05-10T03:30:01Z",
+					"name": "api-access",
+					"namespace": "apps",
+					"resourceVersion": "357254",
+					"uid": "0b2e4349-5eea-4b92-a390-63d481fe659b"
+				},
+				"secrets": [
+					{
++						"name": "api-access-token-hkrrx"
+					}
+				]
+			}
+
+		k get serviceaccount api-access -n apps -o json | jq -r .secrets[].name
+
++			api-access-token-hkrrx
+
+		k get serviceaccount api-access -n apps -o json | jq -r .secrets[].name | base64
+
++			YXBpLWFjY2Vzcy10b2tlbi1oa3JyeA0K
+
+		k exec operator -it -n apps -- /bin/sh
+
+			curl -sk https://192.168.99.100:32769/api/v1/namespaces/rm/pods --header 'Authorization: Bearer YXBpLWFjY2VzczphcGktYWNjZXNzLXRva2VuLWhrcnJ4DQo='  // x
+
+			curl -sk -X DELETE https://192.168.99.100:32769/api/v1/namespaces/rm/pods/disposable --header 'Authorization: Bearer YXBpLWFjY2Vzczp0b2tlbi1oa3JyeA0K'  // x
+
+			curl -sk https://192.168.99.100:32769/api/v1/namespaces/rm/pods --header 'Authorization: Bearer YXBpLWFjY2Vzczp0b2tlbi1oa3JyeA0K'  // x

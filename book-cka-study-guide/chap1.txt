@@ -36,6 +36,7 @@ set up alias
 	alias k=kubectl
 	alias ka='kubectl get all -o wide --show-labels $*'
 	alias kn='kubectl $* -n kube-system'
+	alias kx='kubectl config current-context'
 	k version <tab><tab>
 
 short names
